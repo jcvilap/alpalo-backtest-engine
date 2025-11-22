@@ -71,78 +71,132 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
-            <div className="max-w-[1400px] mx-auto">
-                {/* Header */}
-                <div className="mb-8">
-                    <div className="flex items-center gap-3 mb-2">
-                        <Activity className="w-8 h-8 text-blue-600" />
-                        <h1 className="text-4xl font-bold text-gray-900">Alpalo Backtest Engine</h1>
-                    </div>
-                    <p className="text-gray-600 text-lg">Leveraged ETF Momentum Strategy</p>
-                    <div className="relative group inline-block mt-2">
-                        <div className="text-xs text-gray-500 cursor-help flex items-center gap-1">
-                            {/* Omitted for brevity - Strategy info tooltip */}
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+            {/* Sticky Header - shown when results are loaded */}
+            {result && (
+                <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-md animate-slide-down">
+                    <div className="max-w-[1400px] mx-auto px-6 py-3">
+                        <div className="flex items-center justify-between gap-4">
+                            {/* Title */}
+                            <div className="flex items-center gap-2">
+                                <Activity className="w-6 h-6 text-blue-600" />
+                                <h1 className="text-xl font-bold text-gray-900">Alpalo Backtest Engine</h1>
+                            </div>
+
+                            {/* Condensed Inputs */}
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                    <Calendar className="w-4 h-4 text-gray-400" />
+                                    <input
+                                        type="date"
+                                        value={startDate}
+                                        min={minDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    />
+                                </div>
+                                <span className="text-gray-400">→</span>
+                                <div className="flex items-center gap-2">
+                                    <Calendar className="w-4 h-4 text-gray-400" />
+                                    <input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    />
+                                </div>
+                                <button
+                                    onClick={runBacktest}
+                                    disabled={loading}
+                                    className={`px-4 py-1.5 text-sm rounded-lg font-semibold transition-all flex items-center gap-2 ${loading
+                                        ? 'bg-gray-300 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
+                                        }`}
+                                >
+                                    <Play className="w-4 h-4" />
+                                    {loading ? 'Running...' : 'Run'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
+            )}
 
-                {/* Input Panel */}
-                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
-                            <div className="relative">
-                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    min={minDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                />
-                            </div>
+            <div className={`max-w-[1400px] mx-auto px-6 ${result ? 'pb-6' : 'p-6'}`}>
+                {/* Initial Header - hidden when results are loaded */}
+                {!result && (
+                    <div className="mb-8">
+                        <div className="flex items-center gap-3 mb-2">
+                            <Activity className="w-8 h-8 text-blue-600" />
+                            <h1 className="text-4xl font-bold text-gray-900">Alpalo Backtest Engine</h1>
                         </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
-                            <div className="relative">
-                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                />
+                        <p className="text-gray-600 text-lg">Leveraged ETF Momentum Strategy</p>
+                        <div className="relative group inline-block mt-2">
+                            <div className="text-xs text-gray-500 cursor-help flex items-center gap-1">
+                                {/* Omitted for brevity - Strategy info tooltip */}
                             </div>
-                        </div>
-                        <div>
-                            <button
-                                onClick={runBacktest}
-                                disabled={loading}
-                                className={`w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${loading
-                                    ? 'bg-gray-300 cursor-not-allowed'
-                                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl'
-                                    }`}
-                            >
-                                <Play className="w-5 h-5" />
-                                {loading ? 'Running...' : 'Run Backtest'}
-                            </button>
                         </div>
                     </div>
+                )}
 
-                    {error && (
-                        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-red-800 text-sm">{error}</p>
+                {/* Input Panel - hidden when results are loaded */}
+                {!result && (
+                    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
+                                <div className="relative">
+                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="date"
+                                        value={startDate}
+                                        min={minDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    />
+                                </div>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
+                                <div className="relative">
+                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <button
+                                    onClick={runBacktest}
+                                    disabled={loading}
+                                    className={`w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${loading
+                                        ? 'bg-gray-300 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl'
+                                        }`}
+                                >
+                                    <Play className="w-5 h-5" />
+                                    {loading ? 'Running...' : 'Run Backtest'}
+                                </button>
+                            </div>
                         </div>
-                    )}
-                </div>
+
+                        {error && (
+                            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                <p className="text-red-800 text-sm">{error}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Results */}
                 {result && (
                     <div className="space-y-8">
                         {/* Tabs */}
-                        <div className="flex gap-2 border-b border-gray-200">
+                        <div className="flex gap-2 border-b border-gray-200 mt-6">
                             <button
                                 onClick={() => setActiveTab('overview')}
                                 className={`px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'overview'

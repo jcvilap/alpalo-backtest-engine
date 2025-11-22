@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Alpalo Backtest Engine
+
+A professional-grade backtesting platform for analyzing trading strategies with historical market data. Built with Next.js, TypeScript, and modern data visualization tools to provide comprehensive performance analytics.
+
+## Demo
+
+![Demo](docs/demo.png)
+
+## Features
+
+### Performance Analytics
+- **Comprehensive Metrics**: Total Return, CAGR, Max Drawdown, Win Rate, and Average Position Size
+- **Benchmark Comparisons**: Compare strategy performance against QQQ (Nasdaq-100 ETF) and TQQQ (3x leveraged)
+- **Visual Equity Curve**: Track strategy performance over time with interactive charts
+
+### Trade Analysis
+- **Detailed Trade Log**: Complete history of all trades with entry/exit dates, returns, and position sizing
+- **Position Tracking**: Monitor portfolio allocation percentages and trade-level returns
+- **Performance Breakdown**: Analyze wins, losses, and holding periods
+
+### Monthly Performance Matrix
+- **Heatmap View**: Monthly returns displayed in an intuitive color-coded grid
+- **Year-over-Year Analysis**: Compare performance across different years
+- **Sortable Columns**: Sort by year or YTD performance
+
+## Tech Stack
+
+- **Framework**: Next.js 15 with TypeScript
+- **Data Visualization**: Recharts for interactive charts
+- **Data Source**: Polygon API for historical market data
+- **Styling**: Tailwind CSS with custom design system
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18+ 
+- Polygon API key (for market data)
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/jcvilap/alpalo-backtest-engine.git
+cd alpalo-backtest-engine
+
+# Install dependencies
+npm install
+
+# Configure environment variables
+echo "POLYGON_API_KEY=your_api_key_here" > .env.local
+
+# Prefetch historical data (run once)
+npx tsx scripts/prefetch.ts
+
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3003](http://localhost:3003) to view the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Usage
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Select Date Range**: Choose start and end dates for your backtest period (data available from 2015-2025)
+2. **Run Backtest**: Click "Run Backtest" to execute the analysis
+3. **Review Results**: Explore performance metrics, equity curves, trade logs, and monthly returns across three tabs
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+├── cache/              # Cached historical market data
+├── scripts/            # Data fetching utilities
+├── src/
+│   ├── app/           # Next.js app directory
+│   │   └── api/       # Backend API routes
+│   ├── components/    # React UI components
+│   └── lib/           # Core logic (strategy, backtest engine, data client)
+└── package.json
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Development
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# Run development server
+npm run dev
 
-## Deploy on Vercel
+# Build for production
+npm run build
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Start production server
+npm start
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+MIT
+
+## Author
+
+**Julio C Vila** - [GitHub](https://github.com/jcvilap)
+
+## Acknowledgments
+
+- Market data provided by [Polygon.io](https://polygon.io)
+- Charts powered by [Recharts](https://recharts.org)
