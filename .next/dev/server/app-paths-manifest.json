@@ -1,0 +1,5 @@
+{
+  "/api/backtest/route": "app/api/backtest/route.js",
+  "/api/data-range/route": "app/api/data-range/route.js",
+  "/page": "app/page.js"
+}
