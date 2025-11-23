@@ -27,4 +27,13 @@ export class Indicators {
         }
         return roc;
     }
+
+    static slope(values: number[], lookback: number = 5): number | null {
+        if (values.length <= lookback) return null;
+
+        const last = values[values.length - 1];
+        const prior = values[values.length - 1 - lookback];
+
+        return (last - prior) / lookback;
+    }
 }

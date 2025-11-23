@@ -80,7 +80,7 @@ export class BacktestEngine {
 
 
         // Iterate over NDX data (the driver)
-        for (let i = 250; i < qqqData.length; i++) {
+        for (let i = 260; i < qqqData.length; i++) {
             const date = qqqData[i].date;
             const qqqSlice = qqqData.slice(0, i + 1);
 
@@ -91,54 +91,74 @@ export class BacktestEngine {
             if (!tqqqCandle || !sqqqCandle) continue; // Skip if missing data
 
             const signal = this.strategyController.analyze(qqqSlice);
+            const targetSymbol = signal.symbol as 'TQQQ' | 'SQQQ';
+            const targetPrice = targetSymbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
+            const desiredWeight = Math.max(0, Math.min(1, signal.weight));
 
-            // Execute Signal
-            if (signal.action === 'BUY') {
-                const targetSymbol = signal.symbol; // TQQQ or SQQQ
-                const targetPrice = targetSymbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
+            const existingPositionValue = currentPosition
+                ? currentPosition.shares * (currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close)
+                : 0;
+            let totalEquity = cash + existingPositionValue;
+
+            const closePosition = (exitPrice: number) => {
+                if (!currentPosition) return;
+
+                currentPosition.exitDate = date;
+                currentPosition.exitPrice = exitPrice;
+                currentPosition.pnl = (currentPosition.exitPrice - currentPosition.entryPrice) * currentPosition.shares;
+                currentPosition.returnPct = ((currentPosition.exitPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
+                currentPosition.portfolioReturnPct = (currentPosition.returnPct * (currentPosition.positionSizePct || 0)) / 100;
+
+                const entryTime = new Date(currentPosition.entryDate).getTime();
+                const exitTime = new Date(date).getTime();
+                currentPosition.daysHeld = Math.round((exitTime - entryTime) / (1000 * 60 * 60 * 24));
+
+                cash += currentPosition.exitPrice * currentPosition.shares;
+                trades.push(currentPosition);
+                currentPosition = null;
+                shares = 0;
+            };
+
+            if (desiredWeight === 0) {
+                if (currentPosition) {
+                    const exitPrice = currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
+                    closePosition(exitPrice);
+                    totalEquity = cash;
+                }
+            } else {
+                const currentWeight = totalEquity > 0 ? existingPositionValue / totalEquity : 0;
+                const weightDiff = Math.abs(currentWeight - desiredWeight);
+                const rebalanceThreshold = 0.1; // Avoid churn on tiny changes
 
                 if (currentPosition && currentPosition.symbol !== targetSymbol) {
-                    // Close current
                     const exitPrice = currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
-
-                    currentPosition.exitDate = date;
-                    currentPosition.exitPrice = exitPrice;
-                    currentPosition.pnl = (currentPosition.exitPrice - currentPosition.entryPrice) * currentPosition.shares;
-                    currentPosition.returnPct = ((currentPosition.exitPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
-                    currentPosition.portfolioReturnPct = (currentPosition.returnPct * (currentPosition.positionSizePct || 0)) / 100;
-
-                    const entryTime = new Date(currentPosition.entryDate).getTime();
-                    const exitTime = new Date(date).getTime();
-                    currentPosition.daysHeld = Math.round((exitTime - entryTime) / (1000 * 60 * 60 * 24));
-
-                    cash += currentPosition.exitPrice * currentPosition.shares;
-                    trades.push(currentPosition);
-                    currentPosition = null;
-                    shares = 0;
+                    closePosition(exitPrice);
+                    totalEquity = cash;
+                } else if (currentPosition && weightDiff > rebalanceThreshold) {
+                    const exitPrice = currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
+                    closePosition(exitPrice);
+                    totalEquity = cash;
                 }
 
                 if (!currentPosition) {
-                    // Open new position
-                    const totalEquityAtEntry = cash;
-                    const amountToInvest = cash;
+                    const amountToInvest = totalEquity * desiredWeight;
                     shares = Math.floor(amountToInvest / targetPrice);
-                    const actualInvestment = shares * targetPrice;
-                    cash -= actualInvestment;
 
-                    // Calculate position size percentage
-                    let positionSizePct = 100; // Default to 100%
-                    if (totalEquityAtEntry > 0 && actualInvestment > 0) {
-                        positionSizePct = (actualInvestment / totalEquityAtEntry) * 100;
+                    if (shares > 0) {
+                        const actualInvestment = shares * targetPrice;
+                        cash -= actualInvestment;
+
+                        const positionSizePct = totalEquity > 0 ? (actualInvestment / totalEquity) * 100 : 0;
+
+                        currentPosition = {
+                            entryDate: date,
+                            symbol: targetSymbol,
+                            side: 'LONG',
+                            entryPrice: targetPrice,
+                            shares,
+                            positionSizePct
+                        };
                     }
-
-                    currentPosition = {
-                        entryDate: date,
-                        symbol: targetSymbol,
-                        side: 'LONG',
-                        entryPrice: targetPrice,
-                        shares: shares,
-                        positionSizePct: positionSizePct
-                    };
                 }
             }
 
@@ -148,7 +168,7 @@ export class BacktestEngine {
                 const currentPrice = currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
                 positionValue = currentPosition.shares * currentPrice;
             }
-            const totalEquity = cash + positionValue;
+            const equitySnapshot = cash + positionValue;
 
             // Benchmark Equity (NDX)
             const benchmarkEquity = benchmarkShares * qqqData[i].close;
@@ -157,7 +177,7 @@ export class BacktestEngine {
             const benchmarkTQQQEquity = benchmarkTQQQShares * tqqqCandle.close;
 
             // Normalize to Percentage Change
-            const equityPct = ((totalEquity - this.initialCapital) / this.initialCapital) * 100;
+            const equityPct = ((equitySnapshot - this.initialCapital) / this.initialCapital) * 100;
             const benchmarkPct = ((benchmarkEquity - this.initialCapital) / this.initialCapital) * 100;
             const benchmarkTQQQPct = ((benchmarkTQQQEquity - this.initialCapital) / this.initialCapital) * 100;
 

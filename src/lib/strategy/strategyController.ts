@@ -1,19 +1,29 @@
-import { Strategy, StrategySignal, OHLC } from '../types';
+import { StrategySignal, OHLC } from '../types';
 import { TrendFollowingStrategy } from './trendFollowingStrategy';
 import { MeanReversionStrategy } from './meanReversionStrategy';
 
 export class StrategyController {
-    private strategies: Strategy[] = [];
-
-    constructor() {
-        this.strategies.push(new TrendFollowingStrategy());
-        this.strategies.push(new MeanReversionStrategy());
-    }
+    private trendStrategy = new TrendFollowingStrategy();
+    private meanReversion = new MeanReversionStrategy();
 
     analyze(data: OHLC[]): StrategySignal {
-        const signals = this.strategies.map(s => s.analyze(data));
-        const trendSignal = signals.find(s => s.symbol === 'TQQQ' || s.symbol === 'SQQQ');
+        const trendSignal = this.trendStrategy.analyze(data);
 
-        return trendSignal || { symbol: 'TQQQ', action: 'HOLD', weight: 0, reason: 'No signal' };
+        const overlay = this.meanReversion.adjustWeight(data, trendSignal);
+        const adjustedWeight = overlay.forceFlat
+            ? 0
+            : Math.min(1, Math.max(0, trendSignal.weight * overlay.weightMultiplier));
+
+        const reasonParts = [trendSignal.reason];
+        if (overlay.reason) {
+            reasonParts.push(overlay.reason);
+        }
+
+        return {
+            symbol: trendSignal.symbol,
+            action: adjustedWeight > 0 ? 'BUY' : 'HOLD',
+            weight: adjustedWeight,
+            reason: reasonParts.filter(Boolean).join(' | ')
+        };
     }
 }
