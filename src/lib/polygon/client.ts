@@ -50,10 +50,7 @@ export class PolygonClient {
     }
 
     async fetchAggregates(ticker: string, from: string, to: string): Promise<OHLC[]> {
-        const apiKey = process.env.POLYGON_API_KEY;
-        if (!apiKey) {
-            throw new Error('POLYGON_API_KEY is not set');
-        }
+        const MIN_DATE = '1999-03-10';
 
         // 1. Load Cache
         let cachedData = this.loadCache(ticker);
@@ -63,10 +60,16 @@ export class PolygonClient {
             const cacheStart = cachedData[0].date;
             const cacheEnd = cachedData[cachedData.length - 1].date;
 
-            const reqStart = new Date(from);
+            let reqStart = new Date(from);
             const reqEnd = new Date(to);
             const cStart = new Date(cacheStart);
             const cEnd = new Date(cacheEnd);
+            const minDateObj = new Date(MIN_DATE);
+
+            // Clamp request start to MIN_DATE
+            if (reqStart < minDateObj) {
+                reqStart = minDateObj;
+            }
 
             // If request is fully within cache, return cached slice
             if (reqStart >= cStart && reqEnd <= cEnd) {
@@ -81,27 +84,43 @@ export class PolygonClient {
             const promises: Promise<OHLC[]>[] = [];
 
             // Missing Head
-            if (reqStart < cStart) {
+            // Only fetch head if we don't already have data starting from MIN_DATE
+            if (reqStart < cStart && cStart > minDateObj) {
                 const headEnd = new Date(cStart);
                 headEnd.setDate(headEnd.getDate() - 1);
-                console.log(`[CACHE MISS HEAD] ${ticker}: ${from} to ${headEnd.toISOString().split('T')[0]}`);
-                promises.push(this.fetchFromApi(ticker, from, headEnd.toISOString().split('T')[0]));
+                console.log(`[CACHE MISS HEAD] ${ticker}: ${reqStart.toISOString().split('T')[0]} to ${headEnd.toISOString().split('T')[0]}`);
+                promises.push(this.fetchFromApi(ticker, reqStart.toISOString().split('T')[0], headEnd.toISOString().split('T')[0]));
             }
 
             // Missing Tail
             if (reqEnd > cEnd) {
                 const tailStart = new Date(cEnd);
                 tailStart.setDate(tailStart.getDate() + 1);
-                console.log(`[CACHE MISS TAIL] ${ticker}: ${tailStart.toISOString().split('T')[0]} to ${to}`);
-                promises.push(this.fetchFromApi(ticker, tailStart.toISOString().split('T')[0], to));
+
+                // Skip weekends for tail start (use UTC to match the date string)
+                while (tailStart.getUTCDay() === 0 || tailStart.getUTCDay() === 6) {
+                    tailStart.setDate(tailStart.getDate() + 1);
+                }
+
+                // Ensure tailStart is not in the future relative to today
+                const today = new Date();
+                // Reset time part of today for accurate comparison
+                today.setHours(0, 0, 0, 0);
+
+                if (tailStart <= today && tailStart <= reqEnd) {
+                    console.log(`[CACHE MISS TAIL] ${ticker}: ${tailStart.toISOString().split('T')[0]} to ${to}`);
+                    promises.push(this.fetchFromApi(ticker, tailStart.toISOString().split('T')[0], to));
+                }
             }
 
             if (promises.length > 0) {
                 try {
                     const newSegments = await Promise.all(promises);
                     const allNewData = newSegments.flat();
-                    cachedData = [...cachedData, ...allNewData];
-                    this.saveCache(ticker, cachedData);
+                    if (allNewData.length > 0) {
+                        cachedData = [...cachedData, ...allNewData];
+                        this.saveCache(ticker, cachedData);
+                    }
                 } catch (error) {
                     // If API fetch fails (e.g., Forbidden for old data), continue with cached data
                     console.warn(`Failed to fetch additional data for ${ticker}:`, error instanceof Error ? error.message : error);
@@ -130,6 +149,10 @@ export class PolygonClient {
 
     private async fetchFromApi(ticker: string, from: string, to: string): Promise<OHLC[]> {
         const apiKey = process.env.POLYGON_API_KEY;
+        console.log('[DEBUG] POLYGON_API_KEY exists:', !!apiKey, 'length:', apiKey?.length);
+        if (!apiKey) {
+            throw new Error('POLYGON_API_KEY is not set');
+        }
         // Polygon API errors if from > to (e.g. asking for a weekend gap or invalid range)
         if (new Date(from) > new Date(to)) {
             return [];
@@ -139,8 +162,16 @@ export class PolygonClient {
 
         const response = await fetch(url);
         if (!response.ok) {
-            // Handle 429 or other errors gracefully? For now throw.
-            throw new Error(`Failed to fetch data for ${ticker}: ${response.statusText}`);
+            let errorMessage = response.statusText;
+            try {
+                const errorBody = await response.text(); // Try to read body
+                if (errorBody) {
+                    errorMessage = `${response.statusText} - ${errorBody}`;
+                }
+            } catch {
+                // Ignore body parsing error
+            }
+            throw new Error(`Failed to fetch data for ${ticker}: ${errorMessage}`);
         }
 
         const data = await response.json();
