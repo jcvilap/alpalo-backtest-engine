@@ -5,7 +5,7 @@ import { fetchBacktestData } from '@/lib/backtest/dataFetcher';
 
 export async function POST(request: Request) {
     try {
-        const { from, to } = await request.json();
+        const { from, to, displayFrom } = await request.json();
 
         if (!from || !to) {
             return NextResponse.json({ error: 'Missing from or to date' }, { status: 400 });
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
         // Run backtest
         const engine = new BacktestEngine(10000);
-        const result = engine.run(qqqData, tqqqData, sqqqData);
+        const result = engine.run(qqqData, tqqqData, sqqqData, displayFrom);
 
         return NextResponse.json(result);
 

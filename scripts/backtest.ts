@@ -44,26 +44,26 @@ function formatNumber(value: number, decimals: number = 2): string {
     return value.toFixed(decimals);
 }
 
-async function runBacktest(startDate: string, endDate: string, capital: number) {
+async function runBacktest(startDate: string, endDate: string, capital: number, displayFrom: string) {
     console.log(`\n${colors.bright}═══════════════════════════════════════════════════════════${colors.reset}`);
     console.log(`${colors.bright}${colors.cyan}         ALPALO BACKTEST ENGINE - CONSOLE MODE${colors.reset}`);
     console.log(`${colors.bright}═══════════════════════════════════════════════════════════${colors.reset}\n`);
 
-    console.log(`${colors.gray}Date Range: ${startDate} → ${endDate}${colors.reset}`);
+    console.log(`${colors.gray}Date Range: ${displayFrom} → ${endDate}${colors.reset}`);
     console.log(`${colors.gray}Capital:    $${capital.toLocaleString()}${colors.reset}\n`);
 
     try {
         // Initialize Polygon client
         const polygonClient = new PolygonClient();
 
-        console.log(`${colors.gray}📊 Fetching historical data...${colors.reset}`);
+        console.log(`${colors.blue}📊 Fetching historical data (including warmup)...${colors.reset}`);
 
         // Fetch data using shared utility
         const { qqqData, tqqqData, sqqqData } = await fetchBacktestData(polygonClient, startDate, endDate);
 
-        if (qqqData.length === 0) {
-            console.error(`${colors.red}❌ No data available for the specified date range${colors.reset}`);
-            process.exit(1);
+        if (tqqqData.length === 0) {
+            console.error(`${colors.red}❌ No data available for TQQQ${colors.reset}`);
+            return;
         }
 
         console.log(`${colors.green}✓ Loaded ${qqqData.length} trading days${colors.reset}\n`);
@@ -72,7 +72,7 @@ async function runBacktest(startDate: string, endDate: string, capital: number) 
         console.log(`${colors.gray}⚡ Running backtest...${colors.reset}`);
 
         const engine = new BacktestEngine(capital);
-        const result = engine.run(qqqData, tqqqData, sqqqData);
+        const result = engine.run(qqqData, tqqqData, sqqqData, displayFrom);
 
         console.log(`${colors.green}✓ Backtest complete${colors.reset}\n`);
 
@@ -178,7 +178,12 @@ async function main() {
         endDate = positionalArgs[1];
     }
 
-    await runBacktest(startDate, endDate, capital);
+    // Calculate fetch start date (1 year prior for warmup)
+    const fetchStartDate = new Date(startDate);
+    fetchStartDate.setFullYear(fetchStartDate.getFullYear() - 1);
+    const fetchStartStr = fetchStartDate.toISOString().split('T')[0];
+
+    await runBacktest(fetchStartStr, endDate, capital, startDate);
 }
 
 main();

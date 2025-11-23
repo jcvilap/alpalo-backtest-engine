@@ -59,7 +59,7 @@ export class BacktestEngine {
         this.initialCapital = initialCapital;
     }
 
-    run(qqqData: OHLC[], tqqqData: OHLC[], sqqqData: OHLC[]): BacktestResult {
+    run(qqqData: OHLC[], tqqqData: OHLC[], sqqqData: OHLC[], displayFrom?: string): BacktestResult {
         let cash = this.initialCapital;
         let currentPosition: Trade | null = null;
         const trades: Trade[] = [];
@@ -210,10 +210,65 @@ export class BacktestEngine {
             }
         }
 
+        // Filter and Re-base results if displayFrom is provided
+        let finalTrades = trades;
+        let finalEquityCurve = equityCurve;
+
+        if (displayFrom) {
+            const displayDate = new Date(displayFrom);
+
+            // Filter trades that exited after the display date
+            finalTrades = trades.filter(t => {
+                const exitDate = t.exitDate ? new Date(t.exitDate) : new Date();
+                return exitDate >= displayDate;
+            });
+
+            // Filter equity curve
+            const startIndex = equityCurve.findIndex(d => new Date(d.date) >= displayDate);
+
+            if (startIndex !== -1) {
+                const basePoint = equityCurve[startIndex];
+
+                // Calculate re-basing factors (convert percentages back to multipliers)
+                const baseEquityMult = 1 + (basePoint.equity / 100);
+                const baseBenchmarkMult = 1 + (basePoint.benchmark / 100);
+                const baseTQQQMult = 1 + (basePoint.benchmarkTQQQ / 100);
+
+                finalEquityCurve = equityCurve.slice(startIndex).map(d => {
+                    const currentEquityMult = 1 + (d.equity / 100);
+                    const currentBenchmarkMult = 1 + (d.benchmark / 100);
+                    const currentTQQQMult = 1 + (d.benchmarkTQQQ / 100);
+
+                    return {
+                        date: d.date,
+                        equity: ((currentEquityMult / baseEquityMult) - 1) * 100,
+                        benchmark: ((currentBenchmarkMult / baseBenchmarkMult) - 1) * 100,
+                        benchmarkTQQQ: ((currentTQQQMult / baseTQQQMult) - 1) * 100
+                    };
+                });
+
+                // Ensure we start at 0 if the first point isn't exactly 0 (it should be 0 by definition of re-basing, but good to be safe)
+                // Actually, the first point in the slice will be exactly 0 after re-basing.
+                // But if the slice starts AFTER displayFrom (e.g. gap in data), we might want to prepend a 0 point at displayFrom.
+                if (finalEquityCurve.length > 0 && finalEquityCurve[0].date > displayFrom) {
+                    finalEquityCurve.unshift({
+                        date: displayFrom,
+                        equity: 0,
+                        benchmark: 0,
+                        benchmarkTQQQ: 0
+                    });
+                }
+            } else {
+                // No data after display date? Return empty or just what we have if it's close?
+                // If we have no data after display date, return empty
+                finalEquityCurve = [];
+            }
+        }
+
         return {
-            trades,
-            equityCurve,
-            metrics: this.calculateMetrics(equityCurve, trades)
+            trades: finalTrades,
+            equityCurve: finalEquityCurve,
+            metrics: this.calculateMetrics(finalEquityCurve, finalTrades)
         };
     }
 
