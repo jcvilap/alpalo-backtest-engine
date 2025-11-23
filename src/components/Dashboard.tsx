@@ -18,6 +18,8 @@ export default function Dashboard() {
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'monthly'>('overview');
 
+    const [selectedRange, setSelectedRange] = useState<string | null>(null);
+
     // Auto-populate dates from cache
     useEffect(() => {
         fetch('/api/data-range')
@@ -40,8 +42,11 @@ export default function Dashboard() {
             });
     }, []);
 
-    const runBacktest = async () => {
-        if (!startDate || !endDate) {
+    const runBacktest = async (overrideStart?: string, overrideEnd?: string) => {
+        const start = overrideStart || startDate;
+        const end = overrideEnd || endDate;
+
+        if (!start || !end) {
             setError('Please select both start and end dates');
             return;
         }
@@ -50,10 +55,19 @@ export default function Dashboard() {
         setError(null);
 
         try {
+            // Calculate fetch start date (1 year prior for warmup)
+            const fetchStartDate = new Date(start);
+            fetchStartDate.setFullYear(fetchStartDate.getFullYear() - 1);
+            const fetchStartStr = fetchStartDate.toISOString().split('T')[0];
+
             const res = await fetch('/api/backtest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ from: startDate, to: endDate })
+                body: JSON.stringify({
+                    from: fetchStartStr,
+                    to: end,
+                    displayFrom: start
+                })
             });
 
             if (!res.ok) {
@@ -92,7 +106,10 @@ export default function Dashboard() {
                                         type="date"
                                         value={startDate}
                                         min={minDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
+                                        onChange={(e) => {
+                                            setStartDate(e.target.value);
+                                            setSelectedRange(null);
+                                        }}
                                         className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     />
                                 </div>
@@ -102,12 +119,15 @@ export default function Dashboard() {
                                     <input
                                         type="date"
                                         value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
+                                        onChange={(e) => {
+                                            setEndDate(e.target.value);
+                                            setSelectedRange(null);
+                                        }}
                                         className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     />
                                 </div>
                                 <button
-                                    onClick={runBacktest}
+                                    onClick={() => runBacktest()}
                                     disabled={loading}
                                     className={`px-4 py-1.5 text-sm rounded-lg font-semibold transition-all flex items-center gap-2 ${loading
                                         ? 'bg-gray-300 cursor-not-allowed'
@@ -152,7 +172,10 @@ export default function Dashboard() {
                                         type="date"
                                         value={startDate}
                                         min={minDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
+                                        onChange={(e) => {
+                                            setStartDate(e.target.value);
+                                            setSelectedRange(null);
+                                        }}
                                         className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     />
                                 </div>
@@ -164,14 +187,17 @@ export default function Dashboard() {
                                     <input
                                         type="date"
                                         value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
+                                        onChange={(e) => {
+                                            setEndDate(e.target.value);
+                                            setSelectedRange(null);
+                                        }}
                                         className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     />
                                 </div>
                             </div>
                             <div>
                                 <button
-                                    onClick={runBacktest}
+                                    onClick={() => runBacktest()}
                                     disabled={loading}
                                     className={`w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${loading
                                         ? 'bg-gray-300 cursor-not-allowed'
@@ -204,32 +230,17 @@ export default function Dashboard() {
                                     const { startDate: newStart, endDate: newEnd } = getDateRange(range, new Date(endDate || new Date()));
                                     setStartDate(newStart);
                                     setEndDate(newEnd);
+                                    setSelectedRange(range);
+
                                     // Trigger backtest immediately with new dates
-                                    // We need to use the new values directly since state update is async
                                     if (newStart && newEnd) {
-                                        setLoading(true);
-                                        setError(null);
-                                        fetch('/api/backtest', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ from: newStart, to: newEnd })
-                                        })
-                                            .then(async res => {
-                                                if (!res.ok) {
-                                                    const errorText = await res.text();
-                                                    throw new Error(errorText || 'Backtest failed');
-                                                }
-                                                return res.json();
-                                            })
-                                            .then(data => setResult(data))
-                                            .catch(err => {
-                                                const message = err instanceof Error ? err.message : 'Unknown error';
-                                                setError(`Backtest error: ${message}`);
-                                            })
-                                            .finally(() => setLoading(false));
+                                        runBacktest(newStart, newEnd);
                                     }
                                 }}
-                                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                                className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${selectedRange === range
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                                    }`}
                             >
                                 {range}
                             </button>
@@ -239,60 +250,70 @@ export default function Dashboard() {
 
                 {/* Results */}
                 {result && (
-                    <div className="space-y-8">
-                        {/* Tabs */}
-                        <div className="flex gap-2 border-b border-gray-200 mt-6">
-                            <button
-                                onClick={() => setActiveTab('overview')}
-                                className={`px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'overview'
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-600 hover:text-gray-900'
-                                    }`}
-                            >
-                                <BarChart2 className="w-4 h-4" />
-                                Overview
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('trades')}
-                                className={`px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'trades'
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-600 hover:text-gray-900'
-                                    }`}
-                            >
-                                <List className="w-4 h-4" />
-                                Trades
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('monthly')}
-                                className={`px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'monthly'
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-600 hover:text-gray-900'
-                                    }`}
-                            >
-                                <Calendar className="w-4 h-4" />
-                                Monthly
-                            </button>
-                        </div>
-
-                        {/* Tab Content */}
-                        <div>
-                            {/* OVERVIEW TAB */}
-                            {activeTab === 'overview' && (
-                                <div className="space-y-8">
-                                    <PerformanceWidgets metrics={result.metrics} />
-                                    <EquityChart equityCurve={result.equityCurve} />
+                    <div className="relative min-h-[400px]">
+                        {loading && (
+                            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-40 flex items-center justify-center rounded-2xl">
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                    <p className="text-blue-700 font-medium animate-pulse">Running Backtest...</p>
                                 </div>
-                            )}
+                            </div>
+                        )}
+                        <div className="space-y-8">
+                            {/* Tabs */}
+                            <div className="flex gap-2 border-b border-gray-200 mt-6">
+                                <button
+                                    onClick={() => setActiveTab('overview')}
+                                    className={`px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'overview'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    <BarChart2 className="w-4 h-4" />
+                                    Overview
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('trades')}
+                                    className={`px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'trades'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    <List className="w-4 h-4" />
+                                    Trades
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('monthly')}
+                                    className={`px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'monthly'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    <Calendar className="w-4 h-4" />
+                                    Monthly
+                                </button>
+                            </div>
 
-                            {/* TRADES TAB */}
-                            {activeTab === 'trades' && (
-                                <TradeLogTable trades={result.trades} />
-                            )}
+                            {/* Tab Content */}
+                            <div>
+                                {/* OVERVIEW TAB */}
+                                {activeTab === 'overview' && (
+                                    <div className="space-y-8">
+                                        <PerformanceWidgets metrics={result.metrics} />
+                                        <EquityChart equityCurve={result.equityCurve} />
+                                    </div>
+                                )}
 
-                            {/* MONTHLY PERFORMANCE TAB */}
-                            {activeTab === 'monthly' && (
-                                <MonthlyPerformanceMatrix equityCurve={result.equityCurve} />
-                            )}
+                                {/* TRADES TAB */}
+                                {activeTab === 'trades' && (
+                                    <TradeLogTable trades={result.trades} />
+                                )}
+
+                                {/* MONTHLY PERFORMANCE TAB */}
+                                {activeTab === 'monthly' && (
+                                    <MonthlyPerformanceMatrix equityCurve={result.equityCurve} />
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
