@@ -24,7 +24,7 @@ export async function POST(request: Request) {
         }
 
         // Run backtest
-        const engine = new BacktestEngine(10000);
+        const engine = new BacktestEngine(1_000_000);
         const result = engine.run(qqqData, tqqqData, sqqqData);
 
         return NextResponse.json(result);
