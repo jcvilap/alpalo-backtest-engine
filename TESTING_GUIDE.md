@@ -121,7 +121,165 @@ Should show 3 JSON files:
 
 ---
 
+## Step 4A: Quick CLI Backtest (Alternative to Browser)
+
+**This is an OPTIONAL step for running backtests directly in the terminal without the browser UI.**
+
+The CLI tool provides instant backtest results with formatted console output - perfect for quick analysis or automated testing.
+
+### Available Date Range Options
+
+The CLI accepts the same predefined ranges as the UI:
+- **Months**: `1M`, `2M`, `3M`, `4M`, `5M`, `6M`
+- **Year to Date**: `YTD`
+- **Years**: `1YR`, `2YR`, `3YR`, `4YR`, `5YR`, `10YR`
+- **Custom**: Any specific dates in `YYYY-MM-DD` format
+
+### Usage Examples
+
+#### Example 1: Full 10-Year Backtest (Default)
+```bash
+npm run backtest
+```
+
+**Expected Output**:
+```
+═══════════════════════════════════════════════════════════
+         ALPALO BACKTEST ENGINE - CONSOLE MODE
+═══════════════════════════════════════════════════════════
+
+Date Range: 2015-11-22 → 2025-11-22
+
+📊 Fetching historical data...
+✓ Loaded 2513 trading days
+
+⚡ Running backtest...
+✓ Backtest complete
+
+PERFORMANCE METRICS
+───────────────────────────────────────────────────────────
+
+  Total Return        +393.39%
+  CAGR                +19.45%
+  Max Drawdown        -79.94%
+  Win Rate            +13.30%
+  Avg Position Size   +99.30%
+  Sharpe Ratio        0.85
+  Total Trades        45
+
+BENCHMARK COMPARISON
+───────────────────────────────────────────────────────────
+
+  Strategy                 +393.39%
+  QQQ (Nasdaq-100)         +396.27%
+  TQQQ (3x Leveraged)      +1680.95%
+
+TRADE SUMMARY
+───────────────────────────────────────────────────────────
+
+  Total Trades:    45
+  Wins:            6
+  Losses:          39
+  Win Rate:        +13.30%
+
+═══════════════════════════════════════════════════════════
+```
+
+#### Example 2: Last 1 Year
+```bash
+npm run backtest 1YR
+```
+
+#### Example 3: Year to Date
+```bash
+npm run backtest YTD
+```
+
+#### Example 4: Last 6 Months
+```bash
+npm run backtest 6M
+```
+
+#### Example 5: Custom Start Date (to today)
+```bash
+npm run backtest 2024-01-01
+```
+
+#### Example 6: Custom Date Range
+```bash
+npm run backtest 2024-01-01 2024-12-31
+```
+
+### Verification Steps
+
+After running any backtest:
+
+1. **Check for errors** - Should complete without red error messages
+2. **Verify metrics** - All percentages should be valid numbers (not NaN)
+3. **Compare with UI** - Running the same date range in the browser should produce identical results
+4. **Performance check** - Should complete in 2-5 seconds
+
+### Testing All Predefined Ranges
+
+Run through all options to verify functionality:
+
+```bash
+# Test all monthly ranges
+npm run backtest 1M
+npm run backtest 2M
+npm run backtest 3M
+npm run backtest 4M
+npm run backtest 5M
+npm run backtest 6M
+
+# Test YTD
+npm run backtest YTD
+
+# Test yearly ranges
+npm run backtest 1YR
+npm run backtest 2YR
+npm run backtest 3YR
+npm run backtest 4YR
+npm run backtest 5YR
+npm run backtest 10YR
+```
+
+### Common Issues
+
+#### Error: "Cannot find module"
+**Solution**: Ensure dependencies are installed: `npm install`
+
+#### Error: "No data available"
+**Solution**: Run prefetch script first: `npx tsx scripts/prefetch.ts`
+
+#### Error: "Forbidden"
+**Solution**: Check your `POLYGON_API_KEY` in `.env.local`
+
+#### Different results than UI
+**Solution**: Verify you're using the exact same date range in both.
+**Note**: The CLI and UI use the exact same underlying logic (`BacktestEngine` and `fetchBacktestData`), so results should be identical for the same inputs.
+
+### When to Use CLI vs Browser
+
+**Use CLI when**:
+- Quick performance check needed
+- Automating multiple backtests
+- Testing different date ranges rapidly
+- No need for visual charts
+- Working in a server/headless environment
+
+**Use Browser UI when**:
+- Need to see equity curves visually
+- Analyzing monthly performance matrix
+- Reviewing detailed trade log
+- Presenting results to others
+- Exploring data interactively
+
+---
+
 ## Step 5: Start Development Server
+
+
 
 ### Action
 ```bash
