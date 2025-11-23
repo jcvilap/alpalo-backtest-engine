@@ -4,17 +4,6 @@ This guide provides step-by-step instructions for running and testing the Alpalo
 
 ---
 
-## Prerequisites
-
-Before starting, verify you have:
-- **Node.js**: Version 18 or higher (`node --version`)
-- **npm**: Version 8 or higher (`npm --version`)
-- **Polygon API Key**: Free or paid account from [polygon.io](https://polygon.io)
-- **Terminal Access**: Command line interface
-- **Web Browser**: Modern browser (Chrome, Firefox, Safari, or Edge)
-
----
-
 ## Step 1: Clone and Navigate to Repository
 
 ### Action
