@@ -44,12 +44,13 @@ function formatNumber(value: number, decimals: number = 2): string {
     return value.toFixed(decimals);
 }
 
-async function runBacktest(startDate: string, endDate: string) {
+async function runBacktest(startDate: string, endDate: string, capital: number) {
     console.log(`\n${colors.bright}═══════════════════════════════════════════════════════════${colors.reset}`);
     console.log(`${colors.bright}${colors.cyan}         ALPALO BACKTEST ENGINE - CONSOLE MODE${colors.reset}`);
     console.log(`${colors.bright}═══════════════════════════════════════════════════════════${colors.reset}\n`);
 
-    console.log(`${colors.gray}Date Range: ${startDate} → ${endDate}${colors.reset}\n`);
+    console.log(`${colors.gray}Date Range: ${startDate} → ${endDate}${colors.reset}`);
+    console.log(`${colors.gray}Capital:    $${capital.toLocaleString()}${colors.reset}\n`);
 
     try {
         // Initialize Polygon client
@@ -70,7 +71,7 @@ async function runBacktest(startDate: string, endDate: string) {
         // Run backtest
         console.log(`${colors.gray}⚡ Running backtest...${colors.reset}`);
 
-        const engine = new BacktestEngine();
+        const engine = new BacktestEngine(capital);
         const result = engine.run(qqqData, tqqqData, sqqqData);
 
         console.log(`${colors.green}✓ Backtest complete${colors.reset}\n`);
@@ -136,14 +137,30 @@ async function main() {
     const args = process.argv.slice(2);
     let startDate: string;
     let endDate: string;
+    let capital: number = 1_000_000; // Default capital
 
-    if (args.length === 0) {
+    // Parse arguments manually to separate flags from positional args
+    const positionalArgs: string[] = [];
+
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (arg === '--capital') {
+            if (i + 1 < args.length) {
+                capital = Number(args[i + 1]);
+                i++; // Skip next arg as it's the value
+            }
+        } else if (!arg.startsWith('--')) {
+            positionalArgs.push(arg);
+        }
+    }
+
+    if (positionalArgs.length === 0) {
         // Default: Full 10-year backtest
         const range = getDateRange('10YR');
         startDate = range.startDate;
         endDate = range.endDate;
-    } else if (args.length === 1) {
-        const arg = args[0];
+    } else if (positionalArgs.length === 1) {
+        const arg = positionalArgs[0];
 
         // Check if it's a predefined range
         if (DATE_RANGE_OPTIONS.includes(arg as DateRangeKey)) {
@@ -157,11 +174,11 @@ async function main() {
         }
     } else {
         // Both start and end dates provided
-        startDate = args[0];
-        endDate = args[1];
+        startDate = positionalArgs[0];
+        endDate = positionalArgs[1];
     }
 
-    await runBacktest(startDate, endDate);
+    await runBacktest(startDate, endDate, capital);
 }
 
 main();
