@@ -3,13 +3,22 @@ import fs from 'fs';
 import path from 'path';
 
 
+import os from 'os';
+
 const BASE_URL = 'https://api.polygon.io/v2/aggs/ticker';
-const CACHE_DIR = path.join(process.cwd(), 'cache');
+// Use /tmp in production (Vercel) or local cache dir in development
+const CACHE_DIR = process.env.NODE_ENV === 'production'
+    ? path.join(os.tmpdir(), 'alpalo-cache')
+    : path.join(process.cwd(), 'cache');
 
 export class PolygonClient {
     constructor() {
-        if (!fs.existsSync(CACHE_DIR)) {
-            fs.mkdirSync(CACHE_DIR, { recursive: true });
+        try {
+            if (!fs.existsSync(CACHE_DIR)) {
+                fs.mkdirSync(CACHE_DIR, { recursive: true });
+            }
+        } catch (e) {
+            console.warn('Failed to create cache directory, caching disabled:', e);
         }
     }
 
