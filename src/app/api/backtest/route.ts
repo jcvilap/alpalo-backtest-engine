@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { PolygonClient } from '@/lib/polygon/client';
 import { BacktestEngine } from '@/lib/backtest/backtestEngine';
+import { fetchBacktestData } from '@/lib/backtest/dataFetcher';
 
 export async function POST(request: Request) {
     try {
-        const { from, to } = await request.json();
+        const { from, to, displayFrom } = await request.json();
 
         if (!from || !to) {
             return NextResponse.json({ error: 'Missing from or to date' }, { status: 400 });
@@ -12,20 +13,16 @@ export async function POST(request: Request) {
 
         const client = new PolygonClient();
 
-        // Fetch data concurrently
-        const [tqqqData, sqqqData, qqqData] = await Promise.all([
-            client.fetchAggregates('TQQQ', from, to),
-            client.fetchAggregates('SQQQ', from, to),
-            client.fetchAggregates('QQQ', from, to)
-        ]);
+        // Fetch data using shared utility
+        const { qqqData, tqqqData, sqqqData } = await fetchBacktestData(client, from, to);
 
         if (tqqqData.length === 0) {
             return NextResponse.json({ error: 'No data available for TQQQ' }, { status: 404 });
         }
 
         // Run backtest
-        const engine = new BacktestEngine(1_000_000);
-        const result = engine.run(qqqData, tqqqData, sqqqData);
+        const engine = new BacktestEngine(10000);
+        const result = engine.run(qqqData, tqqqData, sqqqData, displayFrom);
 
         return NextResponse.json(result);
 
