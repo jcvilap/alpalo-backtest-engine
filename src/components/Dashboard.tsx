@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getDateRange, DATE_RANGE_OPTIONS, DateRangeKey } from '@/lib/utils/dateRanges';
+import { getDateRange, DATE_RANGE_OPTIONS } from '@/lib/utils/dateRanges';
 import { Calendar, Play, Activity, AlertTriangle, BarChart2, List } from 'lucide-react';
 import { BacktestResult } from '@/lib/backtest/backtestEngine';
 import PerformanceWidgets from './PerformanceWidgets';

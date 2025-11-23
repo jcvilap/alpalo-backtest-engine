@@ -94,7 +94,7 @@ export class PolygonClient {
 
             // Missing Tail
             if (reqEnd > cEnd) {
-                let tailStart = new Date(cEnd);
+                const tailStart = new Date(cEnd);
                 tailStart.setDate(tailStart.getDate() + 1);
 
                 // Skip weekends for tail start (use UTC to match the date string)
@@ -149,6 +149,7 @@ export class PolygonClient {
 
     private async fetchFromApi(ticker: string, from: string, to: string): Promise<OHLC[]> {
         const apiKey = process.env.POLYGON_API_KEY;
+        console.log('[DEBUG] POLYGON_API_KEY exists:', !!apiKey, 'length:', apiKey?.length);
         if (!apiKey) {
             throw new Error('POLYGON_API_KEY is not set');
         }
@@ -167,7 +168,7 @@ export class PolygonClient {
                 if (errorBody) {
                     errorMessage = `${response.statusText} - ${errorBody}`;
                 }
-            } catch (e) {
+            } catch {
                 // Ignore body parsing error
             }
             throw new Error(`Failed to fetch data for ${ticker}: ${errorMessage}`);

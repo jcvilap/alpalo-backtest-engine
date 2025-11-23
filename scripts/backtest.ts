@@ -12,6 +12,7 @@
  */
 
 import dotenv from 'dotenv';
+import { OHLC } from '../src/lib/types';
 import { BacktestEngine, BacktestResult } from '../src/lib/backtest/backtestEngine';
 import { PolygonClient } from '../src/lib/polygon/client';
 import { getDateRange, DATE_RANGE_OPTIONS, DateRangeKey } from '../src/lib/utils/dateRanges';
@@ -43,9 +44,9 @@ function formatNumber(value: number, decimals: number = 2): string {
 }
 
 async function runBacktest(
-    qqqData: any[],
-    tqqqData: any[],
-    sqqqData: any[],
+    qqqData: OHLC[],
+    tqqqData: OHLC[],
+    sqqqData: OHLC[],
     capital: number,
     displayFrom: string
 ): Promise<BacktestResult> {
