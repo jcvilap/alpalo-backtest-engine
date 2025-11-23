@@ -50,11 +50,6 @@ export class PolygonClient {
     }
 
     async fetchAggregates(ticker: string, from: string, to: string): Promise<OHLC[]> {
-        const apiKey = process.env.POLYGON_API_KEY;
-        if (!apiKey) {
-            throw new Error('POLYGON_API_KEY is not set');
-        }
-
         // 1. Load Cache
         let cachedData = this.loadCache(ticker);
 
@@ -130,6 +125,9 @@ export class PolygonClient {
 
     private async fetchFromApi(ticker: string, from: string, to: string): Promise<OHLC[]> {
         const apiKey = process.env.POLYGON_API_KEY;
+        if (!apiKey) {
+            throw new Error('POLYGON_API_KEY is not set');
+        }
         // Polygon API errors if from > to (e.g. asking for a weekend gap or invalid range)
         if (new Date(from) > new Date(to)) {
             return [];
