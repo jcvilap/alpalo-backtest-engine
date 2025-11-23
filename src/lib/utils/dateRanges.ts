@@ -2,7 +2,7 @@
  * Utility functions for calculating predefined date ranges
  */
 
-export type DateRangeKey = '1M' | '2M' | '3M' | '4M' | '5M' | '6M' | 'YTD' | '1YR' | '2YR' | '3YR' | '4YR' | '5YR' | '10YR';
+export type DateRangeKey = '1M' | '2M' | '3M' | '4M' | '5M' | '6M' | 'YTD' | '1YR' | '2YR' | '3YR' | '4YR' | '5YR' | '7YR' | '10YR' | '12YR' | '15YR' | '20YR' | 'ALL';
 
 export interface DateRange {
     startDate: string;
@@ -57,9 +57,24 @@ export function getStartDateForRange(range: DateRangeKey, referenceDate: Date = 
         case '5YR':
             date.setFullYear(date.getFullYear() - 5);
             break;
+        case '7YR':
+            date.setFullYear(date.getFullYear() - 7);
+            break;
         case '10YR':
             date.setFullYear(date.getFullYear() - 10);
             break;
+        case '12YR':
+            date.setFullYear(date.getFullYear() - 12);
+            break;
+        case '15YR':
+            date.setFullYear(date.getFullYear() - 15);
+            break;
+        case '20YR':
+            date.setFullYear(date.getFullYear() - 20);
+            break;
+        case 'ALL':
+            // Set to a date before inception (QQQ started March 1999)
+            return '1999-01-01';
     }
 
     return date.toISOString().split('T')[0];
@@ -84,5 +99,5 @@ export function getDateRange(range: DateRangeKey, referenceDate: Date = new Date
 export const DATE_RANGE_OPTIONS: DateRangeKey[] = [
     '1M', '2M', '3M', '4M', '5M', '6M',
     'YTD',
-    '1YR', '2YR', '3YR', '4YR', '5YR', '10YR'
+    '1YR', '2YR', '3YR', '4YR', '5YR', '7YR', '10YR', '12YR', '15YR', '20YR', 'ALL'
 ];
