@@ -190,28 +190,52 @@ export default function Dashboard() {
                                 <p className="text-red-800 text-sm">{error}</p>
                             </div>
                         )}
-
-                        {/* Predefined Date Range Buttons */}
-                        <div className="mt-4">
-                            <p className="text-xs text-gray-500 mb-2 font-medium">Quick Select:</p>
-                            <div className="flex flex-wrap gap-2">
-                                {DATE_RANGE_OPTIONS.map((range) => (
-                                    <button
-                                        key={range}
-                                        onClick={() => {
-                                            const { startDate: newStart, endDate: newEnd } = getDateRange(range, new Date(endDate || new Date()));
-                                            setStartDate(newStart);
-                                            setEndDate(newEnd);
-                                        }}
-                                        className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
-                                    >
-                                        {range}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
                     </div>
                 )}
+
+                {/* Predefined Date Range Buttons - Always Visible */}
+                <div className={`mb-6 ${result ? 'mt-20' : 'mt-4'}`}>
+                    <p className="text-xs text-gray-500 mb-2 font-medium">Quick Select:</p>
+                    <div className="flex flex-wrap gap-2">
+                        {DATE_RANGE_OPTIONS.map((range) => (
+                            <button
+                                key={range}
+                                onClick={() => {
+                                    const { startDate: newStart, endDate: newEnd } = getDateRange(range, new Date(endDate || new Date()));
+                                    setStartDate(newStart);
+                                    setEndDate(newEnd);
+                                    // Trigger backtest immediately with new dates
+                                    // We need to use the new values directly since state update is async
+                                    if (newStart && newEnd) {
+                                        setLoading(true);
+                                        setError(null);
+                                        fetch('/api/backtest', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ from: newStart, to: newEnd })
+                                        })
+                                            .then(async res => {
+                                                if (!res.ok) {
+                                                    const errorText = await res.text();
+                                                    throw new Error(errorText || 'Backtest failed');
+                                                }
+                                                return res.json();
+                                            })
+                                            .then(data => setResult(data))
+                                            .catch(err => {
+                                                const message = err instanceof Error ? err.message : 'Unknown error';
+                                                setError(`Backtest error: ${message}`);
+                                            })
+                                            .finally(() => setLoading(false));
+                                    }
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                            >
+                                {range}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
                 {/* Results */}
                 {result && (
