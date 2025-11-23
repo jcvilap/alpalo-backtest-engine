@@ -101,7 +101,6 @@ export default function Dashboard() {
                             {/* Condensed Inputs */}
                             <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-2">
-                                    <Calendar className="w-4 h-4 text-gray-400" />
                                     <input
                                         type="date"
                                         value={startDate}
@@ -115,7 +114,6 @@ export default function Dashboard() {
                                 </div>
                                 <span className="text-gray-400">→</span>
                                 <div className="flex items-center gap-2">
-                                    <Calendar className="w-4 h-4 text-gray-400" />
                                     <input
                                         type="date"
                                         value={endDate}
@@ -167,7 +165,6 @@ export default function Dashboard() {
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
                                 <div className="relative">
-                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                                     <input
                                         type="date"
                                         value={startDate}
@@ -176,14 +173,13 @@ export default function Dashboard() {
                                             setStartDate(e.target.value);
                                             setSelectedRange(null);
                                         }}
-                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     />
                                 </div>
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
                                 <div className="relative">
-                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                                     <input
                                         type="date"
                                         value={endDate}
@@ -191,7 +187,7 @@ export default function Dashboard() {
                                             setEndDate(e.target.value);
                                             setSelectedRange(null);
                                         }}
-                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     />
                                 </div>
                             </div>
@@ -220,7 +216,7 @@ export default function Dashboard() {
                 )}
 
                 {/* Predefined Date Range Buttons - Always Visible */}
-                <div className={`mb-6 ${result ? 'mt-20' : 'mt-4'}`}>
+                <div className={`mb-6 ${result ? 'mt-6' : 'mt-4'}`}>
                     <p className="text-xs text-gray-500 mb-2 font-medium">Quick Select:</p>
                     <div className="flex flex-wrap gap-2">
                         {DATE_RANGE_OPTIONS.map((range) => (
