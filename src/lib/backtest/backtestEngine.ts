@@ -95,7 +95,7 @@ export class BacktestEngine {
             const targetPrice = targetSymbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
             const desiredWeight = Math.max(0, Math.min(1, signal.weight));
 
-            const existingPositionValue = currentPosition
+            const existingPositionValue: number = currentPosition
                 ? currentPosition.shares * (currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close)
                 : 0;
             let totalEquity = cash + existingPositionValue;
