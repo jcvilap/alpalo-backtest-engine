@@ -89,19 +89,27 @@ export class PolygonClient {
             }
 
             // Missing Tail
+            // Only fetch if reqEnd is actually later than the last cached date
             if (reqEnd > cEnd) {
                 const tailStart = new Date(cEnd);
                 tailStart.setDate(tailStart.getDate() + 1);
-                console.log(`[CACHE MISS TAIL] ${ticker}: ${tailStart.toISOString().split('T')[0]} to ${to}`);
-                promises.push(this.fetchFromApi(ticker, tailStart.toISOString().split('T')[0], to));
+
+                // Ensure tailStart is not in the future relative to today (though API handles this, good to be explicit)
+                const today = new Date();
+                if (tailStart <= today) {
+                    console.log(`[CACHE MISS TAIL] ${ticker}: ${tailStart.toISOString().split('T')[0]} to ${to}`);
+                    promises.push(this.fetchFromApi(ticker, tailStart.toISOString().split('T')[0], to));
+                }
             }
 
             if (promises.length > 0) {
                 try {
                     const newSegments = await Promise.all(promises);
                     const allNewData = newSegments.flat();
-                    cachedData = [...cachedData, ...allNewData];
-                    this.saveCache(ticker, cachedData);
+                    if (allNewData.length > 0) {
+                        cachedData = [...cachedData, ...allNewData];
+                        this.saveCache(ticker, cachedData);
+                    }
                 } catch (error) {
                     // If API fetch fails (e.g., Forbidden for old data), continue with cached data
                     console.warn(`Failed to fetch additional data for ${ticker}:`, error instanceof Error ? error.message : error);
