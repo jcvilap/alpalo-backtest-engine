@@ -1,6 +1,5 @@
 # Alpalo Backtest Engine
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fjcvilap%2Falpalo-backtest-engine)
 [**Live Demo**](https://alpalo-backtest-engine.vercel.app)
 
 A professional-grade backtesting platform for analyzing trading strategies with historical market data. Built with Next.js, TypeScript, and modern data visualization tools to provide comprehensive performance analytics.
