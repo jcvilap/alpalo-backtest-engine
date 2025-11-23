@@ -49,6 +49,29 @@ export class MeanReversionStrategy implements Strategy {
             };
         }
 
+        // Bear market fades: lean into SQQQ on sharp rallies
+        if (!above200 && zScore20 >= 1.1) {
+            const extra = zScore20 > 2 ? 0.35 : zScore20 > 1.5 ? 0.2 : 0.1;
+            const weight = Math.min(0.45 + extra, 0.9);
+            return {
+                symbol: 'SQQQ',
+                action: 'BUY',
+                weight,
+                reason: `Bear fade: zScore20 ${zScore20.toFixed(2)} above 1.1`
+            };
+        }
+
+        // Bear market exhaustion: small bounce attempts
+        if (!above200 && zScore20 <= -1.6) {
+            const weight = Math.min(0.35 + Math.abs(zScore20) * 0.05, 0.6);
+            return {
+                symbol: 'TQQQ',
+                action: 'BUY',
+                weight,
+                reason: `Bear bounce probe: zScore20 ${zScore20.toFixed(2)} below -1.6`
+            };
+        }
+
         // Bearish mean reversion: fade spikes with SQQQ
         // Stay flat during bear swings; allow only cash bias
 

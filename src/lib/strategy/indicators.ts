@@ -44,4 +44,36 @@ export class Indicators {
 
         return std;
     }
+
+    static averageTrueRange(data: OHLC[], period: number): number[] {
+        if (data.length === 0) {
+            return [];
+        }
+
+        const atr: number[] = [];
+        const trueRange: number[] = [];
+
+        for (let i = 0; i < data.length; i++) {
+            const current = data[i];
+            const prevClose = i > 0 ? data[i - 1].close : current.close;
+            const tr = Math.max(
+                current.high - current.low,
+                Math.abs(current.high - prevClose),
+                Math.abs(current.low - prevClose)
+            );
+
+            trueRange.push(tr);
+
+            if (i + 1 < period) {
+                atr.push(Number.NaN);
+                continue;
+            }
+
+            const window = trueRange.slice(i + 1 - period, i + 1);
+            const avg = window.reduce((sum, val) => sum + val, 0) / period;
+            atr.push(avg);
+        }
+
+        return atr;
+    }
 }
