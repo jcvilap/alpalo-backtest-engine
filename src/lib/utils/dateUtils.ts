@@ -16,7 +16,9 @@ export function toNYDate(date: Date | string | number): Date {
  * Returns the current date/time in New York.
  */
 export function getNYNow(): Date {
-    return toZonedTime(new Date(), NY_TIMEZONE);
+    // Compute current time in New York timezone and return the start of that day.
+    const nyNow = toZonedTime(new Date(), NY_TIMEZONE);
+    return startOfDay(nyNow);
 }
 
 /**
@@ -55,8 +57,10 @@ export function getMostRecentTradingDay(date?: Date): Date {
  * Returns strings in YYYY-MM-DD format.
  */
 export function getDateRange(range: string, anchorDate?: Date): { startDate: string; endDate: string } {
+    // Ensure the end date is anchored to the start of the New York day for consistency.
     const end = anchorDate ? toNYDate(anchorDate) : getNYNow();
-    let start = end;
+    const endNYDay = startOfNYDay(end);
+    let start = endNYDay;
 
     switch (range) {
         case '1M':
@@ -132,7 +136,8 @@ export function getDateRange(range: string, anchorDate?: Date): { startDate: str
 
     return {
         startDate: formatNYDate(start, 'yyyy-MM-dd'),
-        endDate: formatNYDate(end, 'yyyy-MM-dd')
+        // Use the anchored NY day for the end date as well.
+        endDate: formatNYDate(endNYDay, 'yyyy-MM-dd')
     };
 }
 
