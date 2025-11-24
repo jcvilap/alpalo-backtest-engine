@@ -67,8 +67,20 @@ export class BacktestEngine {
         const trades: Trade[] = [];
         const equityCurve: { date: string; equity: number; benchmark: number; benchmarkTQQQ: number }[] = [];
 
+        const displayDate = displayFrom ? toNYDate(displayFrom) : undefined;
+
+        // Determine the first index we should start tracking equity from. We always allow the
+        // strategy to "warm up" on at least 250 days of data for indicator calculations.
+        const warmupStart = 250;
+        const displayStartIndex = displayDate
+            ? Math.max(warmupStart, qqqData.findIndex(d => toNYDate(d.date) >= displayDate))
+            : warmupStart;
+
+        const startIndex = displayStartIndex === -1 ? warmupStart : displayStartIndex;
+        const startDate = qqqData[startIndex]?.date;
+
         // Benchmark tracking (NDX)
-        const initialBenchmarkPrice = qqqData[0]?.close || 1;
+        const initialBenchmarkPrice = startDate ? qqqData[startIndex].close : qqqData[0]?.close || 1;
         const benchmarkShares = this.initialCapital / initialBenchmarkPrice;
 
         // Benchmark tracking (TQQQ)
@@ -76,12 +88,12 @@ export class BacktestEngine {
         const tqqqMap = new Map(tqqqData.map(d => [d.date, d]));
         const sqqqMap = new Map(sqqqData.map(d => [d.date, d]));
 
-        const initialTQQQPrice = tqqqMap.get(qqqData[0]?.date)?.close || 1;
+        const initialTQQQPrice = startDate ? (tqqqMap.get(startDate)?.close || 1) : tqqqMap.get(qqqData[0]?.date)?.close || 1;
         const benchmarkTQQQShares = this.initialCapital / initialTQQQPrice;
 
 
         // Iterate over NDX data (the driver)
-        for (let i = 250; i < qqqData.length; i++) {
+        for (let i = startIndex; i < qqqData.length; i++) {
             const date = qqqData[i].date;
             const qqqSlice = qqqData.slice(0, i + 1);
 
@@ -192,9 +204,7 @@ export class BacktestEngine {
         let finalTrades = trades;
         let finalEquityCurve = equityCurve;
 
-        if (displayFrom) {
-            const displayDate = toNYDate(displayFrom);
-
+        if (displayFrom && displayDate) {
             // Filter trades to only include those that were ENTERED after the display date
             // Using exitDate here caused long-held trades that started years earlier to
             // bleed into shorter ranges (10YR/12YR/etc.), making all long-range presets
