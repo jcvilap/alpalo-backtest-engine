@@ -1,24 +1,32 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { getDateRange, DATE_RANGE_OPTIONS } from '@/lib/utils/dateRanges';
-import { Calendar, Play, Activity, AlertTriangle, BarChart2, List } from 'lucide-react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { getDateRange, DATE_RANGE_OPTIONS, getNYNow, formatNYDate, DateRangeKey } from '@/lib/utils/dateUtils';
+import { Calendar, Play, Activity, AlertTriangle, BarChart2, List, Terminal } from 'lucide-react';
 import { BacktestResult } from '@/lib/backtest/backtestEngine';
 import PerformanceWidgets from './PerformanceWidgets';
 import EquityChart from './EquityChart';
 import TradeLogTable from './TradeLogTable';
 import MonthlyPerformanceMatrix from './MonthlyPerformanceMatrix';
+import { printBacktestResult, CliLine } from '@/lib/utils/resultPrinter';
+import CliOutput from './CliOutput';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 
-export default function Dashboard() {
+function DashboardContent() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
+
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [minDate, setMinDate] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<BacktestResult | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'monthly'>('overview');
-
+    const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'monthly' | 'cli'>('overview');
+    const [cliLines, setCliLines] = useState<CliLine[]>([]);
     const [selectedRange, setSelectedRange] = useState<string | null>(null);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     // Auto-populate dates from cache
     useEffect(() => {
@@ -26,23 +34,157 @@ export default function Dashboard() {
             .then(res => res.json())
             .then(data => {
                 if (data.oldestDate) {
-                    setStartDate(data.oldestDate);
                     setMinDate(data.oldestDate);
                 }
-                if (data.newestDate) {
-                    setEndDate(data.newestDate);
-                } else {
-                    // Fallback to current date
-                    setEndDate(new Date().toISOString().split('T')[0]);
+                // Set default start date to earliest cached data (March 10, 1999)
+                if (!startDate) {
+                    setStartDate('1999-03-10');
                 }
+
+                // Set default end date if not set
+                if (!endDate) {
+                    if (data.newestDate) {
+                        setEndDate(data.newestDate);
+                    } else {
+                        setEndDate(formatNYDate(getNYNow()));
+                    }
+                }
+                setIsInitialized(true);
             })
             .catch(() => {
-                // Fallback on error
-                setEndDate(new Date().toISOString().split('T')[0]);
+                if (!endDate) setEndDate(formatNYDate(getNYNow()));
+                setIsInitialized(true);
             });
     }, []);
 
-    const runBacktest = async (overrideStart?: string, overrideEnd?: string) => {
+    // Helper to parse range parameter
+    const parseRangeParam = (rangeParam: string): { type: 'predefined' | 'custom' | 'invalid'; start?: string; end?: string; range?: string } => {
+        // Check if it's a predefined range
+        if (DATE_RANGE_OPTIONS.includes(rangeParam as DateRangeKey)) {
+            return { type: 'predefined', range: rangeParam };
+        }
+
+        // Check if it's a custom date range (format: YYYY-MM-DD,YYYY-MM-DD)
+        const customDatePattern = /^(\d{4}-\d{2}-\d{2}),(\d{4}-\d{2}-\d{2})$/;
+        const match = rangeParam.match(customDatePattern);
+        if (match) {
+            const [, start, end] = match;
+            // Validate dates
+            const startDate = new Date(start);
+            const endDate = new Date(end);
+            if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime()) && startDate <= endDate) {
+                return { type: 'custom', start, end };
+            }
+        }
+
+        return { type: 'invalid' };
+    };
+
+    // Helper to check if current dates match any predefined range
+    const findMatchingPredefinedRange = (start: string, end: string): DateRangeKey | null => {
+        if (!start || !end) return null;
+
+        // Try each predefined range to see if it matches
+        for (const range of DATE_RANGE_OPTIONS) {
+            const anchor = end ? new Date(end) : undefined;
+            const calculated = getDateRange(range, anchor);
+            if (calculated.startDate === start && calculated.endDate === end) {
+                return range;
+            }
+        }
+        return null;
+    };
+
+    // Auto-select predefined range if manual dates match
+    useEffect(() => {
+        if (!isInitialized || !startDate || !endDate) return;
+
+        // Only check if there's no currently selected range (to avoid overriding user's predefined selection)
+        if (!selectedRange) {
+            const matchingRange = findMatchingPredefinedRange(startDate, endDate);
+            if (matchingRange) {
+                setSelectedRange(matchingRange);
+                // Update URL to use the predefined range instead of custom dates
+                updateUrl(matchingRange);
+            }
+        }
+    }, [startDate, endDate, isInitialized, selectedRange]);
+
+
+    // Handle Deep Linking
+    useEffect(() => {
+        if (!isInitialized) return;
+
+        const rangeParam = searchParams.get('range');
+        const tabParam = searchParams.get('tab');
+
+        // Handle Range Param
+        if (rangeParam) {
+            const parsed = parseRangeParam(rangeParam);
+
+            if (parsed.type === 'predefined') {
+                // Valid predefined range
+                if (parsed.range !== selectedRange) {
+                    const anchor = endDate ? new Date(endDate) : undefined;
+                    const { startDate: newStart, endDate: newEnd } = getDateRange(parsed.range as DateRangeKey, anchor);
+
+                    setStartDate(newStart);
+                    setEndDate(newEnd);
+                    setSelectedRange(parsed.range!);
+
+                    if (!result && !loading) {
+                        runBacktest(newStart, newEnd, parsed.range);
+                    }
+                }
+            } else if (parsed.type === 'custom') {
+                // Valid custom date range
+                const customRangeStr = `${parsed.start},${parsed.end}`;
+                if (parsed.start !== startDate || parsed.end !== endDate || selectedRange) {
+                    setStartDate(parsed.start!);
+                    setEndDate(parsed.end!);
+                    setSelectedRange(''); // Clear predefined range selection
+
+                    if (!result && !loading) {
+                        runBacktest(parsed.start!, parsed.end!, customRangeStr);
+                    }
+                }
+            } else {
+                // Invalid range - redirect to base
+                router.replace(pathname);
+            }
+        }
+
+        // Handle Tab Param
+        if (tabParam) {
+            if (['overview', 'trades', 'monthly', 'cli'].includes(tabParam)) {
+                setActiveTab(tabParam as 'overview' | 'trades' | 'monthly' | 'cli');
+            }
+        }
+    }, [isInitialized, searchParams, endDate, loading, pathname, result, router, selectedRange, startDate]);
+
+    // Update URL when state changes
+    const updateUrl = (range?: string | null, tab?: string, customStart?: string, customEnd?: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+
+        if (customStart && customEnd) {
+            // Custom date range
+            params.set('range', `${customStart},${customEnd}`);
+        } else if (range) {
+            // Predefined range
+            params.set('range', range);
+        } else if (range === null) {
+            params.delete('range');
+        }
+
+        if (tab) {
+            params.set('tab', tab);
+        }
+
+        // Update URL
+        router.push(pathname + '?' + params.toString(), { scroll: false });
+    };
+
+    const runBacktest = async (overrideStart?: string, overrideEnd?: string, rangeLabel?: string) => {
         const start = overrideStart || startDate;
         const end = overrideEnd || endDate;
 
@@ -77,11 +219,40 @@ export default function Dashboard() {
 
             const data = await res.json();
             setResult(data);
+
+            // Print to console if a predefined range was selected
+            if (rangeLabel) {
+                setTimeout(() => {
+                    const lines = printBacktestResult(data, start, end, 1000000, { mode: 'capture' });
+                    setCliLines(lines);
+                }, 100);
+            } else {
+                setCliLines([]);
+            }
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Unknown error';
-            setError(`Backtest error: ${message}`);
+            setError('Backtest error: ' + message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleTabChange = (tab: 'overview' | 'trades' | 'monthly' | 'cli') => {
+        setActiveTab(tab);
+        updateUrl(undefined, tab);
+    };
+
+    const handleRangeSelect = (range: string) => {
+        const anchor = endDate ? new Date(endDate) : undefined;
+        const { startDate: newStart, endDate: newEnd } = getDateRange(range as DateRangeKey, anchor);
+
+        setStartDate(newStart);
+        setEndDate(newEnd);
+        setSelectedRange(range);
+        updateUrl(range, undefined);
+
+        if (newStart && newEnd) {
+            runBacktest(newStart, newEnd, range);
         }
     };
 
@@ -106,8 +277,13 @@ export default function Dashboard() {
                                         value={startDate}
                                         min={minDate}
                                         onChange={(e) => {
-                                            setStartDate(e.target.value);
+                                            const newStart = e.target.value;
+                                            setStartDate(newStart);
                                             setSelectedRange(null);
+                                            // Update URL with custom date range if both dates are set
+                                            if (newStart && endDate) {
+                                                updateUrl(undefined, undefined, newStart, endDate);
+                                            }
                                         }}
                                         className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     />
@@ -118,8 +294,13 @@ export default function Dashboard() {
                                         type="date"
                                         value={endDate}
                                         onChange={(e) => {
-                                            setEndDate(e.target.value);
+                                            const newEnd = e.target.value;
+                                            setEndDate(newEnd);
                                             setSelectedRange(null);
+                                            // Update URL with custom date range if both dates are set
+                                            if (startDate && newEnd) {
+                                                updateUrl(undefined, undefined, startDate, newEnd);
+                                            }
                                         }}
                                         className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     />
@@ -127,10 +308,7 @@ export default function Dashboard() {
                                 <button
                                     onClick={() => runBacktest()}
                                     disabled={loading}
-                                    className={`px-4 py-1.5 text-sm rounded-lg font-semibold transition-all flex items-center gap-2 ${loading
-                                        ? 'bg-gray-300 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
-                                        }`}
+                                    className={'px-4 py-1.5 text-sm rounded-lg font-semibold transition-all flex items-center gap-2 ' + (loading ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white')}
                                 >
                                     <Play className="w-4 h-4" />
                                     {loading ? 'Running...' : 'Run'}
@@ -141,7 +319,7 @@ export default function Dashboard() {
                 </div>
             )}
 
-            <div className={`max-w-[1400px] mx-auto px-6 ${result ? 'pb-6' : 'p-6'}`}>
+            <div className={'max-w-[1400px] mx-auto px-6 ' + (result ? 'pb-6' : 'p-6')}>
                 {/* Initial Header - hidden when results are loaded */}
                 {!result && (
                     <div className="mb-8">
@@ -170,8 +348,13 @@ export default function Dashboard() {
                                         value={startDate}
                                         min={minDate}
                                         onChange={(e) => {
-                                            setStartDate(e.target.value);
+                                            const newStart = e.target.value;
+                                            setStartDate(newStart);
                                             setSelectedRange(null);
+                                            // Update URL with custom date range if both dates are set
+                                            if (newStart && endDate) {
+                                                updateUrl(undefined, undefined, newStart, endDate);
+                                            }
                                         }}
                                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     />
@@ -184,8 +367,13 @@ export default function Dashboard() {
                                         type="date"
                                         value={endDate}
                                         onChange={(e) => {
-                                            setEndDate(e.target.value);
+                                            const newEnd = e.target.value;
+                                            setEndDate(newEnd);
                                             setSelectedRange(null);
+                                            // Update URL with custom date range if both dates are set
+                                            if (startDate && newEnd) {
+                                                updateUrl(undefined, undefined, startDate, newEnd);
+                                            }
                                         }}
                                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                     />
@@ -195,10 +383,7 @@ export default function Dashboard() {
                                 <button
                                     onClick={() => runBacktest()}
                                     disabled={loading}
-                                    className={`w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${loading
-                                        ? 'bg-gray-300 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl'
-                                        }`}
+                                    className={'w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ' + (loading ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl')}
                                 >
                                     <Play className="w-5 h-5" />
                                     {loading ? 'Running...' : 'Run Backtest'}
@@ -216,27 +401,14 @@ export default function Dashboard() {
                 )}
 
                 {/* Predefined Date Range Buttons - Always Visible */}
-                <div className={`mb-6 ${result ? 'mt-6' : 'mt-4'}`}>
+                <div className={'mb-6 ' + (result ? 'mt-6' : 'mt-4')}>
                     <p className="text-xs text-gray-500 mb-2 font-medium">Quick Select:</p>
                     <div className="flex flex-wrap gap-2">
                         {DATE_RANGE_OPTIONS.map((range) => (
                             <button
                                 key={range}
-                                onClick={() => {
-                                    const { startDate: newStart, endDate: newEnd } = getDateRange(range, new Date(endDate || new Date()));
-                                    setStartDate(newStart);
-                                    setEndDate(newEnd);
-                                    setSelectedRange(range);
-
-                                    // Trigger backtest immediately with new dates
-                                    if (newStart && newEnd) {
-                                        runBacktest(newStart, newEnd);
-                                    }
-                                }}
-                                className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${selectedRange === range
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-                                    }`}
+                                onClick={() => handleRangeSelect(range)}
+                                className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ' + (selectedRange === range ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400')}
                             >
                                 {range}
                             </button>
@@ -259,35 +431,35 @@ export default function Dashboard() {
                             {/* Tabs */}
                             <div className="flex gap-2 border-b border-gray-200 mt-6">
                                 <button
-                                    onClick={() => setActiveTab('overview')}
-                                    className={`px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'overview'
-                                        ? 'border-blue-600 text-blue-600'
-                                        : 'border-transparent text-gray-600 hover:text-gray-900'
-                                        }`}
+                                    onClick={() => handleTabChange('overview')}
+                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ' + (activeTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900')}
                                 >
                                     <BarChart2 className="w-4 h-4" />
                                     Overview
                                 </button>
                                 <button
-                                    onClick={() => setActiveTab('trades')}
-                                    className={`px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'trades'
-                                        ? 'border-blue-600 text-blue-600'
-                                        : 'border-transparent text-gray-600 hover:text-gray-900'
-                                        }`}
+                                    onClick={() => handleTabChange('trades')}
+                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ' + (activeTab === 'trades' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900')}
                                 >
                                     <List className="w-4 h-4" />
                                     Trades
                                 </button>
                                 <button
-                                    onClick={() => setActiveTab('monthly')}
-                                    className={`px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'monthly'
-                                        ? 'border-blue-600 text-blue-600'
-                                        : 'border-transparent text-gray-600 hover:text-gray-900'
-                                        }`}
+                                    onClick={() => handleTabChange('monthly')}
+                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ' + (activeTab === 'monthly' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900')}
                                 >
                                     <Calendar className="w-4 h-4" />
                                     Monthly
                                 </button>
+                                {selectedRange && cliLines.length > 0 && (
+                                    <button
+                                        onClick={() => handleTabChange('cli')}
+                                        className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ' + (activeTab === 'cli' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-600 hover:text-gray-900')}
+                                    >
+                                        <Terminal className="w-4 h-4" />
+                                        CLI Output
+                                    </button>
+                                )}
                             </div>
 
                             {/* Tab Content */}
@@ -309,11 +481,24 @@ export default function Dashboard() {
                                 {activeTab === 'monthly' && (
                                     <MonthlyPerformanceMatrix equityCurve={result.equityCurve} />
                                 )}
+
+                                {/* CLI OUTPUT TAB */}
+                                {activeTab === 'cli' && (
+                                    <CliOutput lines={cliLines} />
+                                )}
                             </div>
                         </div>
                     </div>
                 )}
             </div>
         </div>
+    );
+}
+
+export default function Dashboard() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <DashboardContent />
+        </Suspense>
     );
 }
