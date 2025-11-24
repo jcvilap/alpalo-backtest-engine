@@ -27,4 +27,21 @@ export class Indicators {
         }
         return roc;
     }
+
+    static rollingStdDev(data: OHLC[], period: number): number[] {
+        if (data.length < period) {
+            return [];
+        }
+
+        const std: number[] = [];
+
+        for (let i = period - 1; i < data.length; i++) {
+            const window = data.slice(i - period + 1, i + 1).map(candle => candle.close);
+            const mean = window.reduce((acc, val) => acc + val, 0) / period;
+            const variance = window.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / period;
+            std.push(Math.sqrt(variance));
+        }
+
+        return std;
+    }
 }

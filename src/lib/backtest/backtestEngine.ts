@@ -55,17 +55,34 @@ export class BacktestEngine {
     private strategyController: StrategyController;
     private initialCapital: number;
 
-    constructor(initialCapital: number = 10000) {
+    constructor(initialCapital: number = 1_000_000) {
         this.strategyController = new StrategyController();
         this.initialCapital = initialCapital;
     }
 
     run(qqqData: OHLC[], tqqqData: OHLC[], sqqqData: OHLC[], displayFrom?: string): BacktestResult {
         let cash = this.initialCapital;
-        let shares = 0;
         let currentPosition: Trade | null = null;
         const trades: Trade[] = [];
         const equityCurve: { date: string; equity: number; benchmark: number; benchmarkTQQQ: number }[] = [];
+
+        const closePosition = (date: string, price: number) => {
+            if (!currentPosition) return;
+
+            currentPosition.exitDate = date;
+            currentPosition.exitPrice = price;
+            currentPosition.pnl = (currentPosition.exitPrice - currentPosition.entryPrice) * currentPosition.shares;
+            currentPosition.returnPct = ((currentPosition.exitPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
+            currentPosition.portfolioReturnPct = (currentPosition.returnPct * (currentPosition.positionSizePct || 0)) / 100;
+
+            const entryTime = toNYDate(currentPosition.entryDate).getTime();
+            const exitTime = toNYDate(date).getTime();
+            currentPosition.daysHeld = Math.round((exitTime - entryTime) / (1000 * 60 * 60 * 24));
+
+            cash += currentPosition.exitPrice * currentPosition.shares;
+            trades.push(currentPosition);
+            currentPosition = null;
+        };
 
         // Benchmark tracking (NDX)
         const initialBenchmarkPrice = qqqData[0]?.close || 1;
@@ -93,63 +110,80 @@ export class BacktestEngine {
 
             const signal = this.strategyController.analyze(qqqSlice);
 
-            // Execute Signal
-            if (signal.action === 'BUY') {
+            // Calculate current equity before acting
+            const currentPrice = currentPosition
+                ? (currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close)
+                : 0;
+            let positionValue: number = currentPosition ? currentPosition.shares * currentPrice : 0;
+            let totalEquity = cash + positionValue;
+
+            // Execute Signal with position sizing support
+            if (signal.action === 'SELL' || signal.weight <= 0) {
+                if (currentPosition) {
+                    closePosition(date, currentPrice);
+                    positionValue = 0;
+                    totalEquity = cash;
+                }
+            } else if (signal.action === 'BUY') {
                 const targetSymbol = signal.symbol; // TQQQ or SQQQ
                 const targetPrice = targetSymbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
 
                 if (currentPosition && currentPosition.symbol !== targetSymbol) {
-                    // Close current
-                    const exitPrice = currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
-
-                    currentPosition.exitDate = date;
-                    currentPosition.exitPrice = exitPrice;
-                    currentPosition.pnl = (currentPosition.exitPrice - currentPosition.entryPrice) * currentPosition.shares;
-                    currentPosition.returnPct = ((currentPosition.exitPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
-                    currentPosition.portfolioReturnPct = (currentPosition.returnPct * (currentPosition.positionSizePct || 0)) / 100;
-
-                    const entryTime = toNYDate(currentPosition.entryDate).getTime();
-                    const exitTime = toNYDate(date).getTime();
-                    currentPosition.daysHeld = Math.round((exitTime - entryTime) / (1000 * 60 * 60 * 24));
-
-                    cash += currentPosition.exitPrice * currentPosition.shares;
-                    trades.push(currentPosition);
-                    currentPosition = null;
-                    shares = 0;
+                    closePosition(date, currentPrice);
+                    positionValue = 0;
+                    totalEquity = cash;
                 }
 
-                if (!currentPosition) {
-                    // Open new position
-                    const totalEquityAtEntry = cash;
-                    const amountToInvest = cash;
-                    shares = Math.floor(amountToInvest / targetPrice);
-                    const actualInvestment = shares * targetPrice;
+                const targetInvestment = totalEquity * signal.weight;
+                const targetShares = Math.floor(targetInvestment / targetPrice);
+
+                const allocationChanged = currentPosition
+                    ? Math.abs(targetInvestment - positionValue) / (totalEquity || 1) > 0.02
+                    : targetShares > 0;
+
+                if (!currentPosition && targetShares > 0) {
+                    const actualInvestment = targetShares * targetPrice;
                     cash -= actualInvestment;
 
-                    // Calculate position size percentage
-                    let positionSizePct = 100; // Default to 100%
-                    if (totalEquityAtEntry > 0 && actualInvestment > 0) {
-                        positionSizePct = (actualInvestment / totalEquityAtEntry) * 100;
-                    }
+                    const positionSizePct = totalEquity > 0 ? (actualInvestment / totalEquity) * 100 : 0;
 
                     currentPosition = {
                         entryDate: date,
                         symbol: targetSymbol,
                         side: 'LONG',
                         entryPrice: targetPrice,
-                        shares: shares,
+                        shares: targetShares,
                         positionSizePct: positionSizePct
                     };
+                } else if (currentPosition && allocationChanged) {
+                    // Rebalance by closing and reopening with the desired allocation
+                    closePosition(date, currentPrice);
+                    totalEquity = cash;
+
+                    const rebalanceShares = Math.floor((totalEquity * signal.weight) / targetPrice);
+                    if (rebalanceShares > 0) {
+                        const actualInvestment = rebalanceShares * targetPrice;
+                        cash -= actualInvestment;
+                        const positionSizePct = totalEquity > 0 ? (actualInvestment / totalEquity) * 100 : 0;
+
+                        currentPosition = {
+                            entryDate: date,
+                            symbol: targetSymbol,
+                            side: 'LONG',
+                            entryPrice: targetPrice,
+                            shares: rebalanceShares,
+                            positionSizePct: positionSizePct
+                        };
+                    }
                 }
             }
 
-            // Calculate Equity
-            let positionValue = 0;
+            // Calculate Equity after trades
             if (currentPosition) {
-                const currentPrice = currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
-                positionValue = currentPosition.shares * currentPrice;
+                const updatedPrice = currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
+                positionValue = currentPosition.shares * updatedPrice;
             }
-            const totalEquity = cash + positionValue;
+            const totalEquityAfterTrades = cash + positionValue;
 
             // Benchmark Equity (NDX)
             const benchmarkEquity = benchmarkShares * qqqData[i].close;
@@ -158,7 +192,7 @@ export class BacktestEngine {
             const benchmarkTQQQEquity = benchmarkTQQQShares * tqqqCandle.close;
 
             // Normalize to Percentage Change
-            const equityPct = ((totalEquity - this.initialCapital) / this.initialCapital) * 100;
+            const equityPct = ((totalEquityAfterTrades - this.initialCapital) / this.initialCapital) * 100;
             const benchmarkPct = ((benchmarkEquity - this.initialCapital) / this.initialCapital) * 100;
             const benchmarkTQQQPct = ((benchmarkTQQQEquity - this.initialCapital) / this.initialCapital) * 100;
 
@@ -173,18 +207,7 @@ export class BacktestEngine {
 
             if (tqqqLast && sqqqLast) {
                 const exitPrice = currentPosition.symbol === 'TQQQ' ? tqqqLast.close : sqqqLast.close;
-
-                currentPosition.exitDate = lastDate;
-                currentPosition.exitPrice = exitPrice;
-                currentPosition.pnl = (currentPosition.exitPrice - currentPosition.entryPrice) * currentPosition.shares;
-                currentPosition.returnPct = ((currentPosition.exitPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
-                currentPosition.portfolioReturnPct = (currentPosition.returnPct * (currentPosition.positionSizePct || 0)) / 100;
-
-                const entryTime = toNYDate(currentPosition.entryDate).getTime();
-                const exitTime = toNYDate(lastDate).getTime();
-                currentPosition.daysHeld = Math.round((exitTime - entryTime) / (1000 * 60 * 60 * 24));
-
-                trades.push(currentPosition);
+                closePosition(lastDate, exitPrice);
             }
         }
 
