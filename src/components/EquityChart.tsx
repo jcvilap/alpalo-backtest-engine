@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import React, { useCallback, useMemo, useState } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { BacktestResult } from '@/lib/backtest/backtestEngine';
 
@@ -7,7 +7,19 @@ interface EquityChartProps {
     equityCurve: BacktestResult['equityCurve'];
 }
 
+type LineKey = 'equity' | 'benchmark' | 'benchmarkTQQQ';
+
 const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
+    const [visibleLines, setVisibleLines] = useState<Record<LineKey, boolean>>({
+        equity: true,
+        benchmark: true,
+        benchmarkTQQQ: true,
+    });
+
+    const toggleLineVisibility = useCallback((lineKey: keyof typeof visibleLines) => {
+        setVisibleLines((prev) => ({ ...prev, [lineKey]: !prev[lineKey] }));
+    }, []);
+
     // Memoize tooltip formatter to avoid recreating on every render
     const tooltipFormatter = useMemo(() => (val: number) => [`${val.toFixed(2)}%`, ''], []);
 
@@ -23,6 +35,12 @@ const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
 
     const yAxisTickFormatter = useMemo(() => (val: number) => `${val.toFixed(0)}%`, []);
 
+    const legendItems: { key: LineKey; label: string; color: string }[] = [
+        { key: 'equity', label: 'Strategy', color: 'bg-blue-600' },
+        { key: 'benchmark', label: 'QQQ', color: 'bg-gray-400' },
+        { key: 'benchmarkTQQQ', label: 'TQQQ', color: 'bg-purple-500' },
+    ];
+
     return (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-6">
@@ -31,18 +49,18 @@ const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
                     Equity Curve
                 </h2>
                 <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-600" />
-                        <span className="text-gray-600 font-medium">Strategy</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-gray-400" />
-                        <span className="text-gray-600 font-medium">QQQ</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-purple-500" />
-                        <span className="text-gray-600 font-medium">TQQQ</span>
-                    </div>
+                    {legendItems.map((series) => (
+                        <button
+                            key={series.key}
+                            type="button"
+                            onClick={() => toggleLineVisibility(series.key)}
+                            className={`flex items-center gap-2 transition-opacity ${visibleLines[series.key] ? 'opacity-100' : 'opacity-50'}`}
+                            aria-pressed={visibleLines[series.key]}
+                        >
+                            <div className={`w-3 h-3 rounded-full ${series.color}`} />
+                            <span className="text-gray-600 font-medium">{series.label}</span>
+                        </button>
+                    ))}
                 </div>
             </div>
             <div className="h-[400px] w-full">
@@ -66,7 +84,6 @@ const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
                             formatter={tooltipFormatter}
                             labelFormatter={tooltipLabelFormatter}
                         />
-                        <Legend />
                         <Line
                             type="monotone"
                             dataKey="equity"
@@ -75,6 +92,7 @@ const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6, strokeWidth: 0 }}
+                            hide={!visibleLines.equity}
                         />
                         <Line
                             type="monotone"
@@ -84,6 +102,7 @@ const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
                             strokeWidth={2}
                             dot={false}
                             strokeDasharray="5 5"
+                            hide={!visibleLines.benchmark}
                         />
                         <Line
                             type="monotone"
@@ -93,6 +112,7 @@ const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
                             strokeWidth={2}
                             dot={false}
                             strokeDasharray="3 3"
+                            hide={!visibleLines.benchmarkTQQQ}
                         />
                     </LineChart>
                 </ResponsiveContainer>
