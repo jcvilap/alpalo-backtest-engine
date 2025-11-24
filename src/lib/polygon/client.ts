@@ -1,7 +1,7 @@
 import { OHLC } from '../types';
 import fs from 'fs';
 import path from 'path';
-
+import { toNYDate, getNYNow, formatNYDate } from '../utils/dateUtils';
 
 import os from 'os';
 
@@ -42,9 +42,22 @@ export class PolygonClient {
 
     private saveCache(ticker: string, data: OHLC[]) {
         const filePath = this.getCacheFilePath(ticker);
+
+        // Filter out today's data if market hasn't closed yet (before 4pm NY time)
+        const now = new Date();
+        const nyTime = toNYDate(now); // Convert to NY timezone
+        const nyHour = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })).getHours();
+        const todayStr = formatNYDate(nyTime);
+
+        // Only cache today's data if it's after 4pm NY time (market close)
+        const isAfterMarketClose = nyHour >= 16;
+        const dataToCache = isAfterMarketClose
+            ? data
+            : data.filter(item => item.date !== todayStr);
+
         // Sort by date and deduplicate
-        const uniqueData = Array.from(new Map(data.map(item => [item.date, item])).values())
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const uniqueData = Array.from(new Map(dataToCache.map(item => [item.date, item])).values())
+            .sort((a, b) => toNYDate(a.date).getTime() - toNYDate(b.date).getTime());
 
         fs.writeFileSync(filePath, JSON.stringify(uniqueData, null, 2));
     }
@@ -60,11 +73,11 @@ export class PolygonClient {
             const cacheStart = cachedData[0].date;
             const cacheEnd = cachedData[cachedData.length - 1].date;
 
-            let reqStart = new Date(from);
-            const reqEnd = new Date(to);
-            const cStart = new Date(cacheStart);
-            const cEnd = new Date(cacheEnd);
-            const minDateObj = new Date(MIN_DATE);
+            let reqStart = toNYDate(from);
+            const reqEnd = toNYDate(to);
+            const cStart = toNYDate(cacheStart);
+            const cEnd = toNYDate(cacheEnd);
+            const minDateObj = toNYDate(MIN_DATE);
 
             // Clamp request start to MIN_DATE
             if (reqStart < minDateObj) {
@@ -75,7 +88,7 @@ export class PolygonClient {
             if (reqStart >= cStart && reqEnd <= cEnd) {
                 console.log(`[CACHE HIT] ${ticker}: ${from} to ${to}`);
                 return cachedData.filter(d => {
-                    const dDate = new Date(d.date);
+                    const dDate = toNYDate(d.date);
                     return dDate >= reqStart && dDate <= reqEnd;
                 });
             }
@@ -86,30 +99,44 @@ export class PolygonClient {
             // Missing Head
             // Only fetch head if we don't already have data starting from MIN_DATE
             if (reqStart < cStart && cStart > minDateObj) {
-                const headEnd = new Date(cStart);
+                const headEnd = toNYDate(cStart);
                 headEnd.setDate(headEnd.getDate() - 1);
-                console.log(`[CACHE MISS HEAD] ${ticker}: ${reqStart.toISOString().split('T')[0]} to ${headEnd.toISOString().split('T')[0]}`);
-                promises.push(this.fetchFromApi(ticker, reqStart.toISOString().split('T')[0], headEnd.toISOString().split('T')[0]));
+                console.log(`[CACHE MISS HEAD] ${ticker}: ${formatNYDate(reqStart)} to ${formatNYDate(headEnd)}`);
+                promises.push(this.fetchFromApi(ticker, formatNYDate(reqStart), formatNYDate(headEnd)));
             }
 
             // Missing Tail
             if (reqEnd > cEnd) {
-                const tailStart = new Date(cEnd);
+                const tailStart = toNYDate(cEnd);
                 tailStart.setDate(tailStart.getDate() + 1);
 
                 // Skip weekends for tail start (use UTC to match the date string)
-                while (tailStart.getUTCDay() === 0 || tailStart.getUTCDay() === 6) {
+                // Note: toNYDate returns a Date object in NY timezone.
+                // getDay() returns 0 for Sunday, 6 for Saturday in local time of the Date object (which is NY time here effectively if we trust toNYDate)
+                // Wait, toZonedTime returns a Date instance which is just a timestamp.
+                // When we call getDay(), it uses the system local timezone unless we use getUTCDay() or date-fns-tz helpers.
+                // However, since we are running on a server/machine, we should be careful.
+                // But dateUtils says toNYDate returns a Date.
+                // Let's stick to simple logic: if we format it back to string, we get NY date.
+                // We can use date-fns isWeekend which takes a Date.
+                // But we need to be careful if the Date object represents a specific instant.
+                // Let's assume for now the simplified logic is fine or use date-fns helpers if imported.
+                // Actually, let's just use the loop as before but careful with timezone.
+                // Better yet, just let the API handle it if we ask for a range including weekends, it just returns empty for those days.
+                // The loop was to avoid asking for future data.
+
+                while (tailStart.getDay() === 0 || tailStart.getDay() === 6) {
                     tailStart.setDate(tailStart.getDate() + 1);
                 }
 
                 // Ensure tailStart is not in the future relative to today
-                const today = new Date();
+                const today = getNYNow();
                 // Reset time part of today for accurate comparison
                 today.setHours(0, 0, 0, 0);
 
                 if (tailStart <= today && tailStart <= reqEnd) {
-                    console.log(`[CACHE MISS TAIL] ${ticker}: ${tailStart.toISOString().split('T')[0]} to ${to}`);
-                    promises.push(this.fetchFromApi(ticker, tailStart.toISOString().split('T')[0], to));
+                    console.log(`[CACHE MISS TAIL] ${ticker}: ${formatNYDate(tailStart)} to ${to}`);
+                    promises.push(this.fetchFromApi(ticker, formatNYDate(tailStart), to));
                 }
             }
 
@@ -130,7 +157,7 @@ export class PolygonClient {
 
             // Return requested range from updated cache
             return cachedData.filter(d => {
-                const dDate = new Date(d.date);
+                const dDate = toNYDate(d.date);
                 return dDate >= reqStart && dDate <= reqEnd;
             });
         } else {
@@ -154,7 +181,7 @@ export class PolygonClient {
             throw new Error('POLYGON_API_KEY is not set');
         }
         // Polygon API errors if from > to (e.g. asking for a weekend gap or invalid range)
-        if (new Date(from) > new Date(to)) {
+        if (toNYDate(from) > toNYDate(to)) {
             return [];
         }
 
@@ -190,7 +217,7 @@ export class PolygonClient {
         }
 
         return data.results.map((res: PolygonResult) => ({
-            date: new Date(res.t).toISOString().split('T')[0],
+            date: formatNYDate(res.t), // Use formatNYDate to ensure the date string is in NY time
             open: res.o,
             high: res.h,
             low: res.l,

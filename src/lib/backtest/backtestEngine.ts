@@ -1,5 +1,6 @@
 import { StrategyController } from '../strategy/strategyController';
 import { OHLC } from '../types';
+import { toNYDate, getNYNow } from '../utils/dateUtils';
 
 export interface Trade {
     entryDate: string;
@@ -107,8 +108,8 @@ export class BacktestEngine {
                     currentPosition.returnPct = ((currentPosition.exitPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
                     currentPosition.portfolioReturnPct = (currentPosition.returnPct * (currentPosition.positionSizePct || 0)) / 100;
 
-                    const entryTime = new Date(currentPosition.entryDate).getTime();
-                    const exitTime = new Date(date).getTime();
+                    const entryTime = toNYDate(currentPosition.entryDate).getTime();
+                    const exitTime = toNYDate(date).getTime();
                     currentPosition.daysHeld = Math.round((exitTime - entryTime) / (1000 * 60 * 60 * 24));
 
                     cash += currentPosition.exitPrice * currentPosition.shares;
@@ -179,8 +180,8 @@ export class BacktestEngine {
                 currentPosition.returnPct = ((currentPosition.exitPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
                 currentPosition.portfolioReturnPct = (currentPosition.returnPct * (currentPosition.positionSizePct || 0)) / 100;
 
-                const entryTime = new Date(currentPosition.entryDate).getTime();
-                const exitTime = new Date(lastDate).getTime();
+                const entryTime = toNYDate(currentPosition.entryDate).getTime();
+                const exitTime = toNYDate(lastDate).getTime();
                 currentPosition.daysHeld = Math.round((exitTime - entryTime) / (1000 * 60 * 60 * 24));
 
                 trades.push(currentPosition);
@@ -192,16 +193,16 @@ export class BacktestEngine {
         let finalEquityCurve = equityCurve;
 
         if (displayFrom) {
-            const displayDate = new Date(displayFrom);
+            const displayDate = toNYDate(displayFrom);
 
             // Filter trades that exited after the display date
             finalTrades = trades.filter(t => {
-                const exitDate = t.exitDate ? new Date(t.exitDate) : new Date();
+                const exitDate = t.exitDate ? toNYDate(t.exitDate) : getNYNow();
                 return exitDate >= displayDate;
             });
 
             // Filter equity curve
-            const startIndex = equityCurve.findIndex(d => new Date(d.date) >= displayDate);
+            const startIndex = equityCurve.findIndex(d => toNYDate(d.date) >= displayDate);
 
             if (startIndex !== -1) {
                 const basePoint = equityCurve[startIndex];
