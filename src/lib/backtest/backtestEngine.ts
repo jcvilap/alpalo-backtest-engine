@@ -69,24 +69,21 @@ export class BacktestEngine {
 
         const displayDate = displayFrom ? toNYDate(displayFrom) : undefined;
 
-        // Determine the first index we should start tracking equity from. We always allow the
-        // strategy to "warm up" on at least 250 days of data for indicator calculations.
+        // Determine the first index we should start tracking equity from. We allow the
+        // strategy to "warm up" on at least 250 days of data for indicator calculations
+        // and also ensure we don't start before both leveraged ETFs are tradeable.
         const warmupStart = 250;
-        const displayStartIndex = displayDate
-            ? Math.max(warmupStart, qqqData.findIndex(d => toNYDate(d.date) >= displayDate))
-            : warmupStart;
 
-        const startIndex = displayStartIndex === -1 ? warmupStart : displayStartIndex;
+        const tqqqMap = new Map(tqqqData.map(d => [d.date, d]));
+        const sqqqMap = new Map(sqqqData.map(d => [d.date, d]));
+
+        const firstTradableIndex = qqqData.findIndex(d => tqqqMap.has(d.date) && sqqqMap.has(d.date));
+        const startIndex = Math.max(warmupStart, firstTradableIndex === -1 ? 0 : firstTradableIndex);
         const startDate = qqqData[startIndex]?.date;
 
         // Benchmark tracking (NDX)
         const initialBenchmarkPrice = startDate ? qqqData[startIndex].close : qqqData[0]?.close || 1;
         const benchmarkShares = this.initialCapital / initialBenchmarkPrice;
-
-        // Benchmark tracking (TQQQ)
-        // We need to align TQQQ data with NDX data dates
-        const tqqqMap = new Map(tqqqData.map(d => [d.date, d]));
-        const sqqqMap = new Map(sqqqData.map(d => [d.date, d]));
 
         const initialTQQQPrice = startDate ? (tqqqMap.get(startDate)?.close || 1) : tqqqMap.get(qqqData[0]?.date)?.close || 1;
         const benchmarkTQQQShares = this.initialCapital / initialTQQQPrice;
