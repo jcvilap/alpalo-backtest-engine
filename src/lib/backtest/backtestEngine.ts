@@ -195,10 +195,13 @@ export class BacktestEngine {
         if (displayFrom) {
             const displayDate = toNYDate(displayFrom);
 
-            // Filter trades that exited after the display date
+            // Filter trades to only include those that were ENTERED after the display date
+            // Using exitDate here caused long-held trades that started years earlier to
+            // bleed into shorter ranges (10YR/12YR/etc.), making all long-range presets
+            // show identical results. Entry date correctly scopes trades to the range.
             finalTrades = trades.filter(t => {
-                const exitDate = t.exitDate ? toNYDate(t.exitDate) : getNYNow();
-                return exitDate >= displayDate;
+                const entryDate = toNYDate(t.entryDate);
+                return entryDate >= displayDate;
             });
 
             // Filter equity curve
