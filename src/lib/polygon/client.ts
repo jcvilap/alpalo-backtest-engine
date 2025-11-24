@@ -217,8 +217,15 @@ export class PolygonClient {
     async fetchAggregates(ticker: string, from: string, to: string): Promise<OHLC[]> {
         const MIN_DATE = '1999-03-10';
 
-        await this.ensureNextYearCalendarIfNeeded();
-        const allowTodayFetch = await this.shouldFetchTodayData();
+        let allowTodayFetch = false;
+
+        try {
+            await this.ensureNextYearCalendarIfNeeded();
+            allowTodayFetch = await this.shouldFetchTodayData();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn('[CACHE ONLY] Skipping calendar fetch due to error:', message);
+        }
 
         let reqStart = toNYDate(from);
         let reqEnd = toNYDate(to);

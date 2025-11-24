@@ -242,12 +242,28 @@ export class BacktestEngine {
                 // Actually, the first point in the slice will be exactly 0 after re-basing.
                 // But if the slice starts AFTER displayFrom (e.g. gap in data), we might want to prepend a 0 point at displayFrom.
                 if (finalEquityCurve.length > 0 && finalEquityCurve[0].date > displayFrom) {
-                    finalEquityCurve.unshift({
-                        date: displayFrom,
+                    const padDates = qqqData.filter(d => {
+                        const dDate = toNYDate(d.date);
+                        return dDate >= displayDate && dDate < toNYDate(finalEquityCurve[0].date);
+                    });
+
+                    const padPoints = padDates.map(d => ({
+                        date: d.date,
                         equity: 0,
                         benchmark: 0,
                         benchmarkTQQQ: 0
-                    });
+                    }));
+
+                    if (padPoints.length === 0) {
+                        padPoints.push({
+                            date: displayFrom,
+                            equity: 0,
+                            benchmark: 0,
+                            benchmarkTQQQ: 0
+                        });
+                    }
+
+                    finalEquityCurve = [...padPoints, ...finalEquityCurve];
                 }
             } else {
                 // No data after display date? Return empty or just what we have if it's close?
@@ -259,11 +275,15 @@ export class BacktestEngine {
         return {
             trades: finalTrades,
             equityCurve: finalEquityCurve,
-            metrics: this.calculateMetrics(finalEquityCurve, finalTrades)
+            metrics: this.calculateMetrics(finalEquityCurve, finalTrades, displayDate ?? toNYDate(startDate ?? qqqData[0].date))
         };
     }
 
-    private calculateMetrics(equityCurve: { date: string; equity: number; benchmark: number; benchmarkTQQQ: number }[], trades: Trade[]) {
+    private calculateMetrics(
+        equityCurve: { date: string; equity: number; benchmark: number; benchmarkTQQQ: number }[],
+        trades: Trade[],
+        rangeStartDate?: Date
+    ) {
         if (equityCurve.length === 0) {
             const empty = { totalReturn: 0, cagr: 0, maxDrawdown: 0, sharpeRatio: 0 };
             return {
@@ -276,18 +296,21 @@ export class BacktestEngine {
             };
         }
 
-        const strategyMetrics = this.getMetrics(equityCurve.map(d => ({ date: d.date, value: d.equity })));
-        const benchmarkMetrics = this.getMetrics(equityCurve.map(d => ({ date: d.date, value: d.benchmark })));
-        const benchmarkTQQQMetrics = this.getMetrics(equityCurve.map(d => ({ date: d.date, value: d.benchmarkTQQQ })));
+        const metricStartDate = rangeStartDate ?? toNYDate(equityCurve[0].date);
+        const metricEndDate = toNYDate(equityCurve[equityCurve.length - 1].date);
+        const elapsedDays = Math.max(1, Math.round((metricEndDate.getTime() - metricStartDate.getTime()) / (1000 * 60 * 60 * 24)));
+        const elapsedYears = Math.max(elapsedDays / 365, equityCurve.length / 252);
+        const totalDays = Math.max(equityCurve.length, Math.round(elapsedYears * 252));
+        const months = elapsedYears * 12;
 
-        const totalDays = equityCurve.length;
-        const years = totalDays / 252;
-        const months = years * 12;
+        const strategyMetrics = this.getMetrics(equityCurve.map(d => ({ date: d.date, value: d.equity })), elapsedYears);
+        const benchmarkMetrics = this.getMetrics(equityCurve.map(d => ({ date: d.date, value: d.benchmark })), elapsedYears);
+        const benchmarkTQQQMetrics = this.getMetrics(equityCurve.map(d => ({ date: d.date, value: d.benchmarkTQQQ })), elapsedYears);
 
         const avgTrades = {
             daily: totalDays > 0 ? trades.length / totalDays : 0,
             monthly: months > 0 ? trades.length / months : 0,
-            annually: years > 0 ? trades.length / years : 0
+            annually: elapsedYears > 0 ? trades.length / elapsedYears : 0
         };
 
         // Calculate win/loss stats
@@ -314,7 +337,7 @@ export class BacktestEngine {
         };
     }
 
-    private getMetrics(data: { date: string; value: number }[]) {
+    private getMetrics(data: { date: string; value: number }[], elapsedYears?: number) {
         if (data.length === 0) return { totalReturn: 0, cagr: 0, maxDrawdown: 0, sharpeRatio: 0 };
 
         // Data is in percentage change (e.g., 0, 5.5, -2.1)
@@ -324,7 +347,7 @@ export class BacktestEngine {
 
         const totalReturn = (endVal - startVal) / startVal;
 
-        const years = data.length / 252;
+        const years = elapsedYears ?? (data.length / 252);
         const cagr = years > 0 ? Math.pow(endVal / startVal, 1 / years) - 1 : 0;
 
         let maxPeak = -Infinity;
