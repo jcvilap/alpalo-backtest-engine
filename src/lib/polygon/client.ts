@@ -216,9 +216,16 @@ export class PolygonClient {
 
     async fetchAggregates(ticker: string, from: string, to: string): Promise<OHLC[]> {
         const MIN_DATE = '1999-03-10';
+        const apiKey = process.env.POLYGON_API_KEY;
 
-        await this.ensureNextYearCalendarIfNeeded();
-        const allowTodayFetch = await this.shouldFetchTodayData();
+        // When no API key is configured, operate in cache-only mode to allow
+        // deterministic local backtests using the bundled data snapshot.
+        const cacheOnlyMode = !apiKey;
+        if (!cacheOnlyMode) {
+            await this.ensureNextYearCalendarIfNeeded();
+        }
+
+        const allowTodayFetch = cacheOnlyMode ? false : await this.shouldFetchTodayData();
 
         let reqStart = toNYDate(from);
         let reqEnd = toNYDate(to);
@@ -238,6 +245,10 @@ export class PolygonClient {
         let cachedData = this.loadCache(ticker);
 
         if (cachedData.length === 0) {
+            if (cacheOnlyMode) {
+                throw new Error('POLYGON_API_KEY is not set and no cached data is available.');
+            }
+
             console.log(`[CACHE EMPTY] ${ticker}: Fetching fresh data`);
             const fresh = await this.fetchFromApi(ticker, formatNYDate(reqStart), formatNYDate(reqEnd));
             this.saveCache(ticker, fresh, allowTodayFetch);
@@ -258,6 +269,18 @@ export class PolygonClient {
             return cachedData.filter(d => {
                 const dDate = toNYDate(d.date);
                 return dDate >= reqStart && dDate <= reqEnd;
+            });
+        }
+
+        // In cache-only mode, cap the request to cached bounds instead of
+        // attempting network fetches so repeated toggles remain stable.
+        if (cacheOnlyMode) {
+            const boundedStart = reqStart < cStart ? cStart : reqStart;
+            const boundedEnd = reqEnd > cEnd ? cEnd : reqEnd;
+
+            return cachedData.filter(d => {
+                const dDate = toNYDate(d.date);
+                return dDate >= boundedStart && dDate <= boundedEnd;
             });
         }
 
