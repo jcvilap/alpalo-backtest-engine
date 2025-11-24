@@ -2,6 +2,7 @@ import { OHLC } from '../types';
 import fs from 'fs';
 import path from 'path';
 import { toNYDate, getNYNow, formatNYDate } from '../utils/dateUtils';
+import { addDays, subMonths } from 'date-fns';
 
 import os from 'os';
 
@@ -11,7 +12,24 @@ const CACHE_DIR = process.env.NODE_ENV === 'production'
     ? path.join(os.tmpdir(), 'alpalo-cache')
     : path.join(process.cwd(), 'cache');
 
+interface MarketStatusEvent {
+    date: string;
+    status?: string;
+    name?: string;
+}
+
+interface MarketCalendar {
+    year: number;
+    holidays: Set<string>;
+    tradingDays: Set<string>;
+    fetchedAt: string;
+    holidaysArray?: string[];
+    tradingDaysArray?: string[];
+}
+
 export class PolygonClient {
+    private calendarCache: Map<number, MarketCalendar> = new Map();
+
     constructor() {
         try {
             if (!fs.existsSync(CACHE_DIR)) {
@@ -20,6 +38,142 @@ export class PolygonClient {
         } catch (e) {
             console.warn('Failed to create cache directory, caching disabled:', e);
         }
+    }
+
+    private getCalendarFilePath(year: number): string {
+        return path.join(CACHE_DIR, `market-calendar-${year}.json`);
+    }
+
+    private async loadCalendar(year: number): Promise<MarketCalendar | null> {
+        const filePath = this.getCalendarFilePath(year);
+        if (!fs.existsSync(filePath)) return null;
+
+        try {
+            const raw = fs.readFileSync(filePath, 'utf-8');
+            const parsed = JSON.parse(raw) as MarketCalendar;
+            parsed.holidays = new Set(parsed.holidaysArray ?? []);
+            parsed.tradingDays = new Set(parsed.tradingDaysArray ?? []);
+            return parsed;
+        } catch (error) {
+            console.warn(`Failed to read calendar cache for ${year}:`, error);
+            return null;
+        }
+    }
+
+    private saveCalendar(calendar: MarketCalendar) {
+        const filePath = this.getCalendarFilePath(calendar.year);
+        const payload = {
+            year: calendar.year,
+            fetchedAt: calendar.fetchedAt,
+            holidaysArray: Array.from(calendar.holidays),
+            tradingDaysArray: Array.from(calendar.tradingDays)
+        };
+        fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
+    }
+
+    private async fetchCalendarFromApi(year: number): Promise<MarketCalendar> {
+        const apiKey = process.env.POLYGON_API_KEY;
+        if (!apiKey) {
+            throw new Error('POLYGON_API_KEY is not set');
+        }
+
+        const url = `https://api.polygon.io/v1/marketstatus/upcoming?apiKey=${apiKey}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch market calendar: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const events: MarketStatusEvent[] = Array.isArray(data) ? data : data?.results || data || [];
+
+        const holidayDates = new Set<string>();
+        events
+            .filter(event => event?.date && toNYDate(event.date).getFullYear() === year)
+            .forEach(event => {
+                const eventDateStr = formatNYDate(event.date);
+                if ((event.status && event.status !== 'open') || event.name?.toLowerCase().includes('holiday')) {
+                    holidayDates.add(eventDateStr);
+                }
+            });
+
+        const tradingDays = this.computeTradingDaysForYear(year, holidayDates);
+        const calendar: MarketCalendar = {
+            year,
+            holidays: holidayDates,
+            tradingDays,
+            fetchedAt: new Date().toISOString(),
+            holidaysArray: Array.from(holidayDates),
+            tradingDaysArray: Array.from(tradingDays)
+        };
+
+        this.saveCalendar(calendar);
+        return calendar;
+    }
+
+    private computeTradingDaysForYear(year: number, holidays: Set<string>): Set<string> {
+        const tradingDays = new Set<string>();
+        const current = new Date(Date.UTC(year, 0, 1));
+        const end = new Date(Date.UTC(year + 1, 0, 1));
+
+        while (current < end) {
+            const nyDate = toNYDate(current);
+            const day = nyDate.getDay();
+            const dateStr = formatNYDate(nyDate);
+
+            if (day !== 0 && day !== 6 && !holidays.has(dateStr)) {
+                tradingDays.add(dateStr);
+            }
+            current.setUTCDate(current.getUTCDate() + 1);
+        }
+
+        return tradingDays;
+    }
+
+    private async getCalendar(year: number): Promise<MarketCalendar> {
+        if (this.calendarCache.has(year)) {
+            return this.calendarCache.get(year)!;
+        }
+
+        const cached = await this.loadCalendar(year);
+        if (cached) {
+            this.calendarCache.set(year, cached);
+            return cached;
+        }
+
+        const fresh = await this.fetchCalendarFromApi(year);
+        this.calendarCache.set(year, fresh);
+        return fresh;
+    }
+
+    private async getCalendarForDate(date: Date): Promise<MarketCalendar> {
+        const year = toNYDate(date).getFullYear();
+        return this.getCalendar(year);
+    }
+
+    private isTradingDay(date: Date, calendar: MarketCalendar): boolean {
+        const dateStr = formatNYDate(date);
+        return calendar.tradingDays.has(dateStr);
+    }
+
+    private async ensureNextYearCalendarIfNeeded() {
+        const now = getNYNow();
+        if (now.getMonth() === 0 && now.getDate() === 1) {
+            await this.getCalendar(now.getFullYear() + 1);
+        }
+    }
+
+    private async shouldFetchTodayData(): Promise<boolean> {
+        const now = getNYNow();
+        const calendar = await this.getCalendarForDate(now);
+        const isTradingDay = this.isTradingDay(now, calendar);
+
+        if (!isTradingDay) {
+            return false;
+        }
+
+        const minutes = now.getHours() * 60 + now.getMinutes();
+        const marketCloseMinutes = 16 * 60;
+        return minutes >= marketCloseMinutes - 10;
     }
 
     private getCacheFilePath(ticker: string): string {
@@ -40,18 +194,16 @@ export class PolygonClient {
         return [];
     }
 
-    private saveCache(ticker: string, data: OHLC[]) {
+    private saveCache(ticker: string, data: OHLC[], allowToday: boolean = true) {
         const filePath = this.getCacheFilePath(ticker);
 
-        // Filter out today's data if market hasn't closed yet (before 4pm NY time)
-        const now = new Date();
-        const nyTime = toNYDate(now); // Convert to NY timezone
-        const nyHour = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })).getHours();
-        const todayStr = formatNYDate(nyTime);
+        const now = getNYNow();
+        const todayStr = formatNYDate(now);
+        const minutes = now.getHours() * 60 + now.getMinutes();
+        const marketCloseMinutes = 16 * 60;
 
-        // Only cache today's data if it's after 4pm NY time (market close)
-        const isAfterMarketClose = nyHour >= 16;
-        const dataToCache = isAfterMarketClose
+        const isAfterMarketClose = minutes >= marketCloseMinutes;
+        const dataToCache = allowToday && isAfterMarketClose
             ? data
             : data.filter(item => item.date !== todayStr);
 
@@ -65,113 +217,146 @@ export class PolygonClient {
     async fetchAggregates(ticker: string, from: string, to: string): Promise<OHLC[]> {
         const MIN_DATE = '1999-03-10';
 
+        await this.ensureNextYearCalendarIfNeeded();
+        const allowTodayFetch = await this.shouldFetchTodayData();
+
+        let reqStart = toNYDate(from);
+        let reqEnd = toNYDate(to);
+        const minDateObj = toNYDate(MIN_DATE);
+
+        if (reqStart < minDateObj) {
+            reqStart = minDateObj;
+        }
+
+        reqEnd = this.adjustEndDateForToday(reqEnd, reqStart, allowTodayFetch);
+
+        if (reqEnd < reqStart) {
+            reqEnd = reqStart;
+        }
+
         // 1. Load Cache
         let cachedData = this.loadCache(ticker);
 
-        // 2. Check what we have
-        if (cachedData.length > 0) {
-            const cacheStart = cachedData[0].date;
-            const cacheEnd = cachedData[cachedData.length - 1].date;
+        if (cachedData.length === 0) {
+            console.log(`[CACHE EMPTY] ${ticker}: Fetching fresh data`);
+            const fresh = await this.fetchFromApi(ticker, formatNYDate(reqStart), formatNYDate(reqEnd));
+            this.saveCache(ticker, fresh, allowTodayFetch);
+            return fresh;
+        }
 
-            let reqStart = toNYDate(from);
-            const reqEnd = toNYDate(to);
-            const cStart = toNYDate(cacheStart);
-            const cEnd = toNYDate(cacheEnd);
-            const minDateObj = toNYDate(MIN_DATE);
+        // Ensure cache is sorted
+        cachedData.sort((a, b) => toNYDate(a.date).getTime() - toNYDate(b.date).getTime());
 
-            // Clamp request start to MIN_DATE
-            if (reqStart < minDateObj) {
-                reqStart = minDateObj;
-            }
+        const cacheStart = cachedData[0].date;
+        const cacheEnd = cachedData[cachedData.length - 1].date;
+        const cStart = toNYDate(cacheStart);
+        const cEnd = toNYDate(cacheEnd);
 
-            // If request is fully within cache, return cached slice
-            if (reqStart >= cStart && reqEnd <= cEnd) {
-                console.log(`[CACHE HIT] ${ticker}: ${from} to ${to}`);
-                return cachedData.filter(d => {
-                    const dDate = toNYDate(d.date);
-                    return dDate >= reqStart && dDate <= reqEnd;
-                });
-            }
-
-            // Identify missing ranges
-            const promises: Promise<OHLC[]>[] = [];
-
-            // Missing Head
-            // Only fetch head if we don't already have data starting from MIN_DATE
-            if (reqStart < cStart && cStart > minDateObj) {
-                const headEnd = toNYDate(cStart);
-                headEnd.setDate(headEnd.getDate() - 1);
-                console.log(`[CACHE MISS HEAD] ${ticker}: ${formatNYDate(reqStart)} to ${formatNYDate(headEnd)}`);
-                promises.push(this.fetchFromApi(ticker, formatNYDate(reqStart), formatNYDate(headEnd)));
-            }
-
-            // Missing Tail
-            if (reqEnd > cEnd) {
-                const tailStart = toNYDate(cEnd);
-                tailStart.setDate(tailStart.getDate() + 1);
-
-                // Skip weekends for tail start (use UTC to match the date string)
-                // Note: toNYDate returns a Date object in NY timezone.
-                // getDay() returns 0 for Sunday, 6 for Saturday in local time of the Date object (which is NY time here effectively if we trust toNYDate)
-                // Wait, toZonedTime returns a Date instance which is just a timestamp.
-                // When we call getDay(), it uses the system local timezone unless we use getUTCDay() or date-fns-tz helpers.
-                // However, since we are running on a server/machine, we should be careful.
-                // But dateUtils says toNYDate returns a Date.
-                // Let's stick to simple logic: if we format it back to string, we get NY date.
-                // We can use date-fns isWeekend which takes a Date.
-                // But we need to be careful if the Date object represents a specific instant.
-                // Let's assume for now the simplified logic is fine or use date-fns helpers if imported.
-                // Actually, let's just use the loop as before but careful with timezone.
-                // Better yet, just let the API handle it if we ask for a range including weekends, it just returns empty for those days.
-                // The loop was to avoid asking for future data.
-
-                while (tailStart.getDay() === 0 || tailStart.getDay() === 6) {
-                    tailStart.setDate(tailStart.getDate() + 1);
-                }
-
-                // Ensure tailStart is not in the future relative to today
-                const today = getNYNow();
-                // Reset time part of today for accurate comparison
-                today.setHours(0, 0, 0, 0);
-
-                if (tailStart <= today && tailStart <= reqEnd) {
-                    console.log(`[CACHE MISS TAIL] ${ticker}: ${formatNYDate(tailStart)} to ${to}`);
-                    promises.push(this.fetchFromApi(ticker, formatNYDate(tailStart), to));
-                }
-            }
-
-            if (promises.length > 0) {
-                try {
-                    const newSegments = await Promise.all(promises);
-                    const allNewData = newSegments.flat();
-                    if (allNewData.length > 0) {
-                        cachedData = [...cachedData, ...allNewData];
-                        this.saveCache(ticker, cachedData);
-                    }
-                } catch (error) {
-                    // If API fetch fails (e.g., Forbidden for old data), continue with cached data
-                    console.warn(`Failed to fetch additional data for ${ticker}:`, error instanceof Error ? error.message : error);
-                    // Don't throw - use cached data we have
-                }
-            }
-
-            // Return requested range from updated cache
+        // Fully cached
+        if (reqStart >= cStart && reqEnd <= cEnd) {
+            console.log(`[CACHE HIT] ${ticker}: ${from} to ${to}`);
             return cachedData.filter(d => {
                 const dDate = toNYDate(d.date);
                 return dDate >= reqStart && dDate <= reqEnd;
             });
-        } else {
-            // No cache - fetch from API
-            console.log(`[CACHE EMPTY] ${ticker}: Fetching fresh data`);
-            try {
-                const data = await this.fetchFromApi(ticker, from, to);
-                this.saveCache(ticker, data);
-                return data;
-            } catch (error) {
-                console.error(`Failed to fetch data for ${ticker}:`, error instanceof Error ? error.message : error);
-                return []; // Return empty array instead of throwing
+        }
+
+        const fetchPromises: Promise<OHLC[]>[] = [];
+
+        // Fetch missing head if needed
+        if (reqStart < cStart) {
+            const headEnd = addDays(cStart, -1);
+            console.log(`[CACHE MISS HEAD] ${ticker}: ${formatNYDate(reqStart)} to ${formatNYDate(headEnd)}`);
+            fetchPromises.push(this.fetchFromApi(ticker, formatNYDate(reqStart), formatNYDate(headEnd)));
+        }
+
+        // Fetch missing tail based on latest cached date
+        if (reqEnd > cEnd) {
+            const nextExpected = addDays(cEnd, 1);
+            if (nextExpected <= reqEnd) {
+                const tailFetchStart = this.getTailFetchStart(reqEnd, cEnd);
+                console.log(`[CACHE MISS TAIL] ${ticker}: ${formatNYDate(tailFetchStart)} to ${formatNYDate(reqEnd)}`);
+                fetchPromises.push(this.fetchFromApi(ticker, formatNYDate(tailFetchStart), formatNYDate(reqEnd)));
             }
         }
+
+        if (fetchPromises.length > 0) {
+            try {
+                const newSegments = await Promise.all(fetchPromises);
+                const lastMonthData = newSegments.flat();
+
+                const allDataMap = new Map<string, OHLC>();
+                cachedData.forEach(item => allDataMap.set(item.date, item));
+                lastMonthData.forEach(item => allDataMap.set(item.date, item));
+
+                const combined = Array.from(allDataMap.values()).sort(
+                    (a, b) => toNYDate(a.date).getTime() - toNYDate(b.date).getTime()
+                );
+
+                cachedData = await this.populateMissingTradingDays(combined, reqEnd, cEnd);
+                this.saveCache(ticker, cachedData, allowTodayFetch);
+            } catch (error) {
+                console.warn(`Failed to fetch additional data for ${ticker}:`, error instanceof Error ? error.message : error);
+            }
+        }
+
+        return cachedData.filter(d => {
+            const dDate = toNYDate(d.date);
+            return dDate >= reqStart && dDate <= reqEnd;
+        });
+    }
+
+    private adjustEndDateForToday(reqEnd: Date, reqStart: Date, allowTodayFetch: boolean): Date {
+        const now = getNYNow();
+        const reqEndStr = formatNYDate(reqEnd);
+        const todayStr = formatNYDate(now);
+
+        if (reqEndStr === todayStr && !allowTodayFetch) {
+            const adjusted = addDays(reqEnd, -1);
+            return adjusted < reqStart ? reqStart : adjusted;
+        }
+        return reqEnd;
+    }
+
+    private getTailFetchStart(reqEnd: Date, lastCachedEnd: Date): Date {
+        const monthAgo = subMonths(reqEnd, 1);
+        const nextExpected = addDays(lastCachedEnd, 1);
+        return monthAgo < nextExpected ? monthAgo : nextExpected;
+    }
+
+    private async populateMissingTradingDays(data: OHLC[], reqEnd: Date, lastCachedEnd: Date): Promise<OHLC[]> {
+        if (data.length === 0) return data;
+
+        const startFrom = addDays(lastCachedEnd, 1);
+        if (startFrom > reqEnd) {
+            return data;
+        }
+
+        const expectedDates = await this.getTradingDatesBetween(startFrom, reqEnd);
+
+        const dataMap = new Map<string, OHLC>(data.map(item => [item.date, item]));
+        expectedDates.forEach(date => {
+            if (!dataMap.has(date)) {
+                console.warn(`Missing trading day ${date} not returned by API; cache will remain sparse for this date.`);
+            }
+        });
+
+        return Array.from(dataMap.values()).sort((a, b) => toNYDate(a.date).getTime() - toNYDate(b.date).getTime());
+    }
+
+    private async getTradingDatesBetween(start: Date, end: Date): Promise<string[]> {
+        const dates: string[] = [];
+        let cursor = start;
+
+        while (cursor <= end) {
+            const calendar = await this.getCalendarForDate(cursor);
+            if (this.isTradingDay(cursor, calendar)) {
+                dates.push(formatNYDate(cursor));
+            }
+            cursor = addDays(cursor, 1);
+        }
+
+        return dates;
     }
 
     private async fetchFromApi(ticker: string, from: string, to: string): Promise<OHLC[]> {
