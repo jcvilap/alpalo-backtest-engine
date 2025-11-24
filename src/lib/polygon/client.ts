@@ -42,8 +42,21 @@ export class PolygonClient {
 
     private saveCache(ticker: string, data: OHLC[]) {
         const filePath = this.getCacheFilePath(ticker);
+
+        // Filter out today's data if market hasn't closed yet (before 4pm NY time)
+        const now = new Date();
+        const nyTime = toNYDate(now); // Convert to NY timezone
+        const nyHour = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })).getHours();
+        const todayStr = formatNYDate(nyTime);
+
+        // Only cache today's data if it's after 4pm NY time (market close)
+        const isAfterMarketClose = nyHour >= 16;
+        const dataToCache = isAfterMarketClose
+            ? data
+            : data.filter(item => item.date !== todayStr);
+
         // Sort by date and deduplicate
-        const uniqueData = Array.from(new Map(data.map(item => [item.date, item])).values())
+        const uniqueData = Array.from(new Map(dataToCache.map(item => [item.date, item])).values())
             .sort((a, b) => toNYDate(a.date).getTime() - toNYDate(b.date).getTime());
 
         fs.writeFileSync(filePath, JSON.stringify(uniqueData, null, 2));
