@@ -243,13 +243,13 @@ function DashboardContent() {
     };
 
     const handleRangeSelect = (range: string) => {
-        const anchor = endDate ? new Date(endDate) : undefined;
-        const { startDate: newStart, endDate: newEnd } = getDateRange(range as DateRangeKey, anchor);
+        // Always use today as the anchor for predefined ranges
+        const { startDate: newStart, endDate: newEnd } = getDateRange(range as DateRangeKey);
 
         setStartDate(newStart);
         setEndDate(newEnd);
         setSelectedRange(range);
-        updateUrl(range, undefined);
+        updateUrl(range);
 
         if (newStart && newEnd) {
             runBacktest(newStart, newEnd, range);
