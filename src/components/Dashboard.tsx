@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { getDateRange, DATE_RANGE_OPTIONS, getNYNow, formatNYDate, DateRangeKey } from '@/lib/utils/dateUtils';
+import { getDateRange, DATE_RANGE_OPTIONS, getNYNow, formatNYDate, DateRangeKey, toNYDate } from '@/lib/utils/dateUtils';
 import { Calendar, Play, Activity, AlertTriangle, BarChart2, List, Terminal } from 'lucide-react';
 import { BacktestResult } from '@/lib/backtest/backtestEngine';
 import PerformanceWidgets from './PerformanceWidgets';
@@ -243,8 +243,9 @@ function DashboardContent() {
     };
 
     const handleRangeSelect = (range: string) => {
-        // Always use today as the anchor for predefined ranges
-        const { startDate: newStart, endDate: newEnd } = getDateRange(range as DateRangeKey);
+        // Anchor to the latest known end date (fallback to today) for predefined ranges
+        const anchorDate = endDate ? toNYDate(endDate) : undefined;
+        const { startDate: newStart, endDate: newEnd } = getDateRange(range as DateRangeKey, anchorDate);
 
         setStartDate(newStart);
         setEndDate(newEnd);
