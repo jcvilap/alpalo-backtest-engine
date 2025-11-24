@@ -27,4 +27,21 @@ export class Indicators {
         }
         return roc;
     }
+
+    static movingAverageSlope(data: OHLC[], period: number, lookback: number = 20): number[] {
+        if (data.length < period + lookback) {
+            return [];
+        }
+
+        const ma = this.simpleMovingAverage(data, period);
+        const slope: number[] = [];
+
+        for (let i = lookback; i < ma.length; i++) {
+            const past = ma[i - lookback];
+            const current = ma[i];
+            slope.push(((current - past) / past) * 100);
+        }
+
+        return slope;
+    }
 }

@@ -96,49 +96,62 @@ export class BacktestEngine {
             if (signal.action === 'BUY') {
                 const targetSymbol = signal.symbol; // TQQQ or SQQQ
                 const targetPrice = targetSymbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
+                const targetWeight = Math.max(0, Math.min(signal.weight || 0, 1));
 
-                if (currentPosition && currentPosition.symbol !== targetSymbol) {
-                    // Close current
+                if (currentPosition) {
+                    const sameSymbol = currentPosition.symbol === targetSymbol;
+
                     const exitPrice = currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close;
+                    const positionValue = currentPosition.shares * exitPrice;
+                    const totalEquity = cash + positionValue;
+                    const currentWeight = totalEquity > 0 ? positionValue / totalEquity : 0;
 
-                    currentPosition.exitDate = date;
-                    currentPosition.exitPrice = exitPrice;
-                    currentPosition.pnl = (currentPosition.exitPrice - currentPosition.entryPrice) * currentPosition.shares;
-                    currentPosition.returnPct = ((currentPosition.exitPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
-                    currentPosition.portfolioReturnPct = (currentPosition.returnPct * (currentPosition.positionSizePct || 0)) / 100;
+                    const weightShifted = Math.abs(currentWeight - targetWeight) > 0.05;
 
-                    const entryTime = new Date(currentPosition.entryDate).getTime();
-                    const exitTime = new Date(date).getTime();
-                    currentPosition.daysHeld = Math.round((exitTime - entryTime) / (1000 * 60 * 60 * 24));
+                    if (!sameSymbol || weightShifted) {
+                        // Close or rebalance current position
+                        currentPosition.exitDate = date;
+                        currentPosition.exitPrice = exitPrice;
+                        currentPosition.pnl = (currentPosition.exitPrice - currentPosition.entryPrice) * currentPosition.shares;
+                        currentPosition.returnPct = ((currentPosition.exitPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
+                        currentPosition.portfolioReturnPct = (currentPosition.returnPct * (currentPosition.positionSizePct || 0)) / 100;
 
-                    cash += currentPosition.exitPrice * currentPosition.shares;
-                    trades.push(currentPosition);
-                    currentPosition = null;
-                    shares = 0;
+                        const entryTime = new Date(currentPosition.entryDate).getTime();
+                        const exitTime = new Date(date).getTime();
+                        currentPosition.daysHeld = Math.round((exitTime - entryTime) / (1000 * 60 * 60 * 24));
+
+                        cash += currentPosition.exitPrice * currentPosition.shares;
+                        trades.push(currentPosition);
+                        currentPosition = null;
+                        shares = 0;
+                    }
                 }
 
                 if (!currentPosition) {
                     // Open new position
                     const totalEquityAtEntry = cash;
-                    const amountToInvest = cash;
+                    const amountToInvest = cash * targetWeight;
                     shares = Math.floor(amountToInvest / targetPrice);
                     const actualInvestment = shares * targetPrice;
-                    cash -= actualInvestment;
 
-                    // Calculate position size percentage
-                    let positionSizePct = 100; // Default to 100%
-                    if (totalEquityAtEntry > 0 && actualInvestment > 0) {
-                        positionSizePct = (actualInvestment / totalEquityAtEntry) * 100;
+                    if (actualInvestment > 0) {
+                        cash -= actualInvestment;
+
+                        // Calculate position size percentage
+                        let positionSizePct = 100; // Default to 100%
+                        if (totalEquityAtEntry > 0) {
+                            positionSizePct = (actualInvestment / totalEquityAtEntry) * 100;
+                        }
+
+                        currentPosition = {
+                            entryDate: date,
+                            symbol: targetSymbol,
+                            side: 'LONG',
+                            entryPrice: targetPrice,
+                            shares: shares,
+                            positionSizePct: positionSizePct
+                        };
                     }
-
-                    currentPosition = {
-                        entryDate: date,
-                        symbol: targetSymbol,
-                        side: 'LONG',
-                        entryPrice: targetPrice,
-                        shares: shares,
-                        positionSizePct: positionSizePct
-                    };
                 }
             }
 
