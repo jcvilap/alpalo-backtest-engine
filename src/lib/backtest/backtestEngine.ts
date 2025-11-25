@@ -103,12 +103,12 @@ export class BacktestEngine {
             sqqqMapSize: sqqqMap.size,
             qqqDateRange: qqqData.length > 0 ? { first: qqqData[0].date, last: qqqData[qqqData.length - 1].date } : null,
             displayFrom,
-            warmupPeriod: 250,
-            tradingStartDate: qqqData.length > 250 ? qqqData[250].date : null
+            warmupPeriod: 200,
+            tradingStartDate: qqqData.length > 200 ? qqqData[200].date : null
         });
 
         // Iterate over NDX data (the driver)
-        for (let i = 250; i < qqqData.length; i++) {
+        for (let i = 200; i < qqqData.length; i++) {
             const date = qqqData[i].date;
             const qqqSlice = qqqData.slice(0, i + 1);
 
