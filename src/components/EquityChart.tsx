@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Brush } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { BacktestResult } from '@/lib/backtest/backtestEngine';
 
@@ -113,6 +113,13 @@ const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
                             dot={false}
                             strokeDasharray="3 3"
                             hide={!visibleLines.benchmarkTQQQ}
+                        />
+                        <Brush
+                            dataKey="date"
+                            height={30}
+                            stroke="#8884d8"
+                            tickFormatter={xAxisTickFormatter}
+                            alwaysShowText={false}
                         />
                     </LineChart>
                 </ResponsiveContainer>
