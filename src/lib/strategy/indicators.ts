@@ -44,4 +44,23 @@ export class Indicators {
 
         return std;
     }
+
+    /**
+     * Calculates the percentage slope between the latest value and the value "lookback" periods ago.
+     * Returns null when there isn't enough data or the comparison point is zero.
+     */
+    static slope(values: number[], lookback: number): number | null {
+        if (values.length <= lookback) {
+            return null;
+        }
+
+        const latest = values[values.length - 1];
+        const prior = values[values.length - 1 - lookback];
+
+        if (prior === 0) {
+            return null;
+        }
+
+        return ((latest - prior) / prior) * 100;
+    }
 }

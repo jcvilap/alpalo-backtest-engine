@@ -4,7 +4,7 @@ import { MeanReversionStrategy } from './meanReversionStrategy';
 
 export class StrategyController {
     private strategies: Strategy[] = [];
-    private static readonly MAX_WEIGHT = 1.0;
+    private static readonly MAX_WEIGHT = 1.2;
 
     constructor() {
         this.strategies.push(new TrendFollowingStrategy());
