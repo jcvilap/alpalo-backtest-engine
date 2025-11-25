@@ -55,6 +55,7 @@ function DashboardContent() {
                 if (!endDate) setEndDate(formatNYDate(getNYNow()));
                 setIsInitialized(true);
             });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Helper to parse range parameter
@@ -108,6 +109,7 @@ function DashboardContent() {
                 updateUrl(matchingRange);
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [startDate, endDate, isInitialized, selectedRange]);
 
 
@@ -160,6 +162,7 @@ function DashboardContent() {
                 setActiveTab(tabParam as 'overview' | 'trades' | 'monthly' | 'cli');
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isInitialized, searchParams, endDate, loading, pathname, result, router, selectedRange, startDate]);
 
     // Update URL when state changes
