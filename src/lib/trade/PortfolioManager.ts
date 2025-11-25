@@ -49,7 +49,7 @@ export class PortfolioManager {
             const targetShares = Math.floor(targetInvestment / targetPrice);
 
             // Determine if we need to adjust
-            let currentShares = (currentPosition && currentPosition.symbol === targetSymbol) ? currentPosition.shares : 0;
+            const currentShares = (currentPosition && currentPosition.symbol === targetSymbol) ? currentPosition.shares : 0;
 
             // Rebalance Threshold (2%)
             const currentVal = currentShares * targetPrice;

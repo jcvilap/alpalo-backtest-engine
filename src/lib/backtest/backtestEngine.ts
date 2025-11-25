@@ -131,7 +131,7 @@ export class BacktestEngine {
                 ? (currentPosition.symbol === 'TQQQ' ? tqqqCandle.close : sqqqCandle.close)
                 : 0;
             let positionValue: number = currentPosition ? currentPosition.shares * currentPrice : 0;
-            let totalEquity = cash + positionValue;
+            const totalEquity = cash + positionValue;
 
             // Prepare inputs for PortfolioManager
             const currentPos: Position | null = currentPosition ? {
@@ -146,7 +146,7 @@ export class BacktestEngine {
             };
 
             // Get Orders
-            const orders = this.portfolioManager.calculateOrders(signal, currentPos, totalEquity, prices);
+            const orders: Order[] = this.portfolioManager.calculateOrders(signal, currentPos, totalEquity, prices);
 
             // Execute Orders
             for (const order of orders) {
