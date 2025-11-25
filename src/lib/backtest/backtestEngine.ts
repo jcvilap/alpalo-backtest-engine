@@ -108,6 +108,26 @@ export class BacktestEngine {
         });
 
         // Iterate over NDX data (the driver)
+        // 1. Warmup Phase (Strategy in Cash, Benchmark tracking)
+        for (let i = 0; i < 200; i++) {
+            if (!qqqData[i]) continue;
+
+            const date = qqqData[i].date;
+            const tqqqCandle = tqqqMap.get(date);
+
+            if (!tqqqCandle) continue;
+
+            const benchmarkEquity = benchmarkShares * qqqData[i].close;
+            const benchmarkTQQQEquity = benchmarkTQQQShares * tqqqCandle.close;
+
+            const benchmarkPct = ((benchmarkEquity - this.initialCapital) / this.initialCapital) * 100;
+            const benchmarkTQQQPct = ((benchmarkTQQQEquity - this.initialCapital) / this.initialCapital) * 100;
+
+            // Strategy is in Cash (0% return)
+            equityCurve.push({ date, equity: 0, benchmark: benchmarkPct, benchmarkTQQQ: benchmarkTQQQPct });
+        }
+
+        // 2. Trading Phase
         for (let i = 200; i < qqqData.length; i++) {
             const date = qqqData[i].date;
             const qqqSlice = qqqData.slice(0, i + 1);
