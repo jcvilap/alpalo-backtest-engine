@@ -96,9 +96,39 @@ export class BacktestEngine {
         const initialTQQQPrice = tqqqMap.get(qqqData[0]?.date)?.close || 1;
         const benchmarkTQQQShares = this.initialCapital / initialTQQQPrice;
 
+        console.log('[BACKTEST ENGINE] Setup:', {
+            initialCapital: this.initialCapital,
+            qqqDataLength: qqqData.length,
+            tqqqMapSize: tqqqMap.size,
+            sqqqMapSize: sqqqMap.size,
+            qqqDateRange: qqqData.length > 0 ? { first: qqqData[0].date, last: qqqData[qqqData.length - 1].date } : null,
+            displayFrom,
+            warmupPeriod: 200,
+            tradingStartDate: qqqData.length > 200 ? qqqData[200].date : null
+        });
 
         // Iterate over NDX data (the driver)
-        for (let i = 250; i < qqqData.length; i++) {
+        // 1. Warmup Phase (Strategy in Cash, Benchmark tracking)
+        for (let i = 0; i < 200; i++) {
+            if (!qqqData[i]) continue;
+
+            const date = qqqData[i].date;
+            const tqqqCandle = tqqqMap.get(date);
+
+            if (!tqqqCandle) continue;
+
+            const benchmarkEquity = benchmarkShares * qqqData[i].close;
+            const benchmarkTQQQEquity = benchmarkTQQQShares * tqqqCandle.close;
+
+            const benchmarkPct = ((benchmarkEquity - this.initialCapital) / this.initialCapital) * 100;
+            const benchmarkTQQQPct = ((benchmarkTQQQEquity - this.initialCapital) / this.initialCapital) * 100;
+
+            // Strategy is in Cash (0% return)
+            equityCurve.push({ date, equity: 0, benchmark: benchmarkPct, benchmarkTQQQ: benchmarkTQQQPct });
+        }
+
+        // 2. Trading Phase
+        for (let i = 200; i < qqqData.length; i++) {
             const date = qqqData[i].date;
             const qqqSlice = qqqData.slice(0, i + 1);
 
@@ -214,6 +244,12 @@ export class BacktestEngine {
         // Filter and Re-base results if displayFrom is provided
         let finalTrades = trades;
         let finalEquityCurve = equityCurve;
+
+        console.log('[BACKTEST ENGINE] Before displayFrom filter:', {
+            totalTrades: trades.length,
+            equityCurveLength: equityCurve.length,
+            displayFrom
+        });
 
         if (displayFrom) {
             const displayDate = toNYDate(displayFrom);

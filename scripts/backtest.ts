@@ -39,10 +39,24 @@ async function runBacktest(
     tqqqData: OHLC[],
     sqqqData: OHLC[],
     capital: number,
-    displayFrom: string
+    displayFrom: string,
+    displayTo?: string
 ): Promise<BacktestResult> {
+    // Filter data to match the requested range (up to displayTo)
+    // We don't filter start here because the engine needs warmup data before displayFrom
+    let filteredQQQ = qqqData;
+    let filteredTQQQ = tqqqData;
+    let filteredSQQQ = sqqqData;
+
+    if (displayTo) {
+        const toDate = toNYDate(displayTo);
+        filteredQQQ = qqqData.filter(d => toNYDate(d.date) <= toDate);
+        filteredTQQQ = tqqqData.filter(d => toNYDate(d.date) <= toDate);
+        filteredSQQQ = sqqqData.filter(d => toNYDate(d.date) <= toDate);
+    }
+
     const engine = new BacktestEngine(capital);
-    return engine.run(qqqData, tqqqData, sqqqData, displayFrom);
+    return engine.run(filteredQQQ, filteredTQQQ, filteredSQQQ, displayFrom);
 }
 
 async function main() {
@@ -86,10 +100,14 @@ async function main() {
 
         if (DATE_RANGE_OPTIONS.includes(r as DateRangeKey)) {
             // Use new dateUtils logic
-            // getDateRange returns strings in NY time
             const range = getDateRange(r as DateRangeKey, getNYNow());
             start = range.startDate;
             end = range.endDate;
+        } else if (r.includes(':')) {
+            // Custom range: YYYY-MM-DD:YYYY-MM-DD
+            const [s, e] = r.split(':');
+            start = s;
+            end = e;
         } else {
             // Assume custom date or just start date
             start = r;
@@ -124,7 +142,7 @@ async function main() {
             // Single Mode
             const config = rangeConfigs[0];
             console.log(`${colors.gray}⚡ Running backtest for ${config.label}...${colors.reset}`);
-            const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start);
+            const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end);
             printBacktestResult(result, config.start, config.end, capital, { mode: 'cli' });
         } else {
             // Multi Mode
@@ -132,7 +150,7 @@ async function main() {
 
             const results = [];
             for (const config of rangeConfigs) {
-                const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start);
+                const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end);
                 results.push({ range: config.label, result });
             }
 

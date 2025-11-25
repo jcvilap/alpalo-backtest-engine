@@ -35,8 +35,28 @@ export class PolygonClient {
             if (!fs.existsSync(CACHE_DIR)) {
                 fs.mkdirSync(CACHE_DIR, { recursive: true });
             }
+
+            // In production, seed the ephemeral cache from the committed cache if available
+            if (process.env.NODE_ENV === 'production') {
+                const seedDir = path.join(process.cwd(), 'cache');
+                if (fs.existsSync(seedDir)) {
+                    const files = fs.readdirSync(seedDir);
+                    for (const file of files) {
+                        const srcPath = path.join(seedDir, file);
+                        const destPath = path.join(CACHE_DIR, file);
+                        if (!fs.existsSync(destPath)) {
+                            try {
+                                fs.copyFileSync(srcPath, destPath);
+                                console.log(`[CACHE SEED] Copied ${file} to ephemeral cache`);
+                            } catch (err) {
+                                console.warn(`[CACHE SEED] Failed to copy ${file}:`, err);
+                            }
+                        }
+                    }
+                }
+            }
         } catch (e) {
-            console.warn('Failed to create cache directory, caching disabled:', e);
+            console.warn('Failed to create/seed cache directory, caching disabled:', e);
         }
     }
 

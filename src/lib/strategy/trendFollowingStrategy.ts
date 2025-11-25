@@ -5,7 +5,7 @@ export class TrendFollowingStrategy implements Strategy {
     name = 'TrendFollowing';
 
     analyze(data: OHLC[]): StrategySignal {
-        if (data.length < 250) {
+        if (data.length < 200) {
             return { symbol: 'TQQQ', action: 'HOLD', weight: 0, reason: 'Insufficient data' };
         }
         const ma50 = Indicators.simpleMovingAverage(data, 50);
