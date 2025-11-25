@@ -21,7 +21,7 @@ const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
     }, []);
 
     // Memoize tooltip formatter to avoid recreating on every render
-    const tooltipFormatter = useMemo(() => (val: number) => [`${val.toFixed(2)}%`, ''], []);
+    const tooltipFormatter = useMemo(() => (val: number, name: string) => [`${val.toFixed(2)}%`, name], []);
 
     const tooltipLabelFormatter = useMemo(() => (label: string) => {
         const date = new Date(label);
