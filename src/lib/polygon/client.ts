@@ -406,8 +406,7 @@ export class PolygonClient {
             open: parseFloat(res.o.toFixed(2)),
             high: parseFloat(res.h.toFixed(2)),
             low: parseFloat(res.l.toFixed(2)),
-            close: parseFloat(res.c.toFixed(2)),
-            volume: res.v
+            close: parseFloat(res.c.toFixed(2))
         }));
     }
 }
