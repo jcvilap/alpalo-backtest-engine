@@ -403,11 +403,10 @@ export class PolygonClient {
 
         return data.results.map((res: PolygonResult) => ({
             date: formatNYDate(res.t), // Use formatNYDate to ensure the date string is in NY time
-            open: res.o,
-            high: res.h,
-            low: res.l,
-            close: res.c,
-            volume: res.v
+            open: parseFloat(res.o.toFixed(2)),
+            high: parseFloat(res.h.toFixed(2)),
+            low: parseFloat(res.l.toFixed(2)),
+            close: parseFloat(res.c.toFixed(2))
         }));
     }
 }

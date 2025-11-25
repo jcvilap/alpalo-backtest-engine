@@ -55,6 +55,7 @@ function DashboardContent() {
                 if (!endDate) setEndDate(formatNYDate(getNYNow()));
                 setIsInitialized(true);
             });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Helper to parse range parameter
@@ -108,6 +109,7 @@ function DashboardContent() {
                 updateUrl(matchingRange);
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [startDate, endDate, isInitialized, selectedRange]);
 
 
@@ -160,6 +162,7 @@ function DashboardContent() {
                 setActiveTab(tabParam as 'overview' | 'trades' | 'monthly' | 'cli');
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isInitialized, searchParams, endDate, loading, pathname, result, router, selectedRange, startDate]);
 
     // Update URL when state changes
@@ -408,13 +411,24 @@ function DashboardContent() {
                             <button
                                 key={range}
                                 onClick={() => handleRangeSelect(range)}
-                                className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ' + (selectedRange === range ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400')}
+                                disabled={loading}
+                                className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ' + (loading ? 'opacity-50 cursor-not-allowed ' : '') + (selectedRange === range ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400')}
                             >
                                 {range}
                             </button>
                         ))}
                     </div>
                 </div>
+
+                {/* Loader - shown when loading and no results yet */}
+                {loading && !result && (
+                    <div className="flex items-center justify-center min-h-[400px]">
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-blue-700 font-semibold text-lg animate-pulse">Running Backtest...</p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Results */}
                 {result && (
