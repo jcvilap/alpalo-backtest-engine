@@ -127,16 +127,14 @@ function DashboardContent() {
             if (parsed.type === 'predefined') {
                 // Valid predefined range
                 if (parsed.range !== selectedRange) {
-                    const anchor = endDate ? new Date(endDate) : undefined;
-                    const { startDate: newStart, endDate: newEnd } = getDateRange(parsed.range as DateRangeKey, anchor);
+                    const { startDate: newStart, endDate: newEnd } = getDateRange(parsed.range as DateRangeKey);
 
                     setStartDate(newStart);
                     setEndDate(newEnd);
-                    setSelectedRange(parsed.range!);
+                    setSelectedRange(parsed.range as DateRangeKey);
 
-                    if (!result && !loading) {
-                        runBacktest(newStart, newEnd, parsed.range);
-                    }
+                    // Run backtest automatically
+                    runBacktest(newStart, newEnd, parsed.range);
                 }
             } else if (parsed.type === 'custom') {
                 // Valid custom date range
@@ -198,6 +196,8 @@ function DashboardContent() {
 
         setLoading(true);
         setError(null);
+        setResult(null);
+        setCliLines([]); // Clear previous output
 
         try {
             // Calculate fetch start date (1 year prior for warmup)

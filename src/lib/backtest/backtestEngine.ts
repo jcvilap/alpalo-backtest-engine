@@ -96,16 +96,6 @@ export class BacktestEngine {
         const initialTQQQPrice = tqqqMap.get(qqqData[0]?.date)?.close || 1;
         const benchmarkTQQQShares = this.initialCapital / initialTQQQPrice;
 
-        console.log('[BACKTEST ENGINE] Setup:', {
-            initialCapital: this.initialCapital,
-            qqqDataLength: qqqData.length,
-            tqqqMapSize: tqqqMap.size,
-            sqqqMapSize: sqqqMap.size,
-            qqqDateRange: qqqData.length > 0 ? { first: qqqData[0].date, last: qqqData[qqqData.length - 1].date } : null,
-            displayFrom,
-            warmupPeriod: 250,
-            tradingStartDate: qqqData.length > 250 ? qqqData[250].date : null
-        });
 
         // Iterate over NDX data (the driver)
         for (let i = 250; i < qqqData.length; i++) {
@@ -224,12 +214,6 @@ export class BacktestEngine {
         // Filter and Re-base results if displayFrom is provided
         let finalTrades = trades;
         let finalEquityCurve = equityCurve;
-
-        console.log('[BACKTEST ENGINE] Before displayFrom filter:', {
-            totalTrades: trades.length,
-            equityCurveLength: equityCurve.length,
-            displayFrom
-        });
 
         if (displayFrom) {
             const displayDate = toNYDate(displayFrom);
