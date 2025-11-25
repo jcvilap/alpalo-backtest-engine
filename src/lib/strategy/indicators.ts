@@ -44,4 +44,19 @@ export class Indicators {
 
         return std;
     }
+
+    /**
+     * Calculates the percentage slope of a moving average over a lookback window.
+     * Returns null when there is not enough data to compute the slope.
+     */
+    static movingAverageSlope(ma: number[], lookback: number): number | null {
+        if (ma.length < lookback + 1) return null;
+
+        const current = ma[ma.length - 1];
+        const past = ma[ma.length - 1 - lookback];
+
+        if (past === 0) return null;
+
+        return ((current - past) / past) * 100;
+    }
 }
