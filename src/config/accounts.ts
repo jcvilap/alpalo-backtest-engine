@@ -58,7 +58,7 @@ export function getConfiguredAccounts(): AccountConfig[] {
                 return accounts;
             }
         } catch (error) {
-            // @ts-expect-error
+            // @ts-expect-error -- need to deploy quickly resolve type on next commit please
             console.warn(`Failed to parse TRADING_ACCOUNTS_CONFIG: ${error.message}`);
         }
     }
