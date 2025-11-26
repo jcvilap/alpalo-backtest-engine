@@ -13,11 +13,15 @@
 
 import dotenv from 'dotenv';
 import { OHLC } from '../src/lib/types';
-import { BacktestEngine, BacktestResult } from '../src/lib/backtest/backtestEngine';
+import { BacktestResult } from '../src/lib/backtest/backtestEngine';
 import { PolygonClient } from '../src/lib/polygon/client';
 import { getDateRange, DATE_RANGE_OPTIONS, DateRangeKey, getNYNow, formatNYDate, toNYDate } from '../src/lib/utils/dateUtils';
 import { fetchBacktestData } from '../src/lib/backtest/dataFetcher';
 import { printBacktestResult, printComparisonTable } from '../src/lib/utils/resultPrinter';
+import { BacktestDataFeed } from '../src/backtest/BacktestDataFeed';
+import { BacktestBroker } from '../src/backtest/BacktestBroker';
+import { BacktestRunner } from '../src/backtest/BacktestRunner';
+import { createDefaultStrategyParams } from '../src/strategy/engine';
 
 // Load .env.local file
 dotenv.config({ path: '.env.local' });
@@ -55,8 +59,20 @@ async function runBacktest(
         filteredSQQQ = sqqqData.filter(d => toNYDate(d.date) <= toDate);
     }
 
-    const engine = new BacktestEngine(capital);
-    return engine.run(filteredQQQ, filteredTQQQ, filteredSQQQ, displayFrom);
+    // NEW ARCHITECTURE: Use BacktestRunner with adapters
+    const dataFeed = new BacktestDataFeed(filteredQQQ, filteredTQQQ, filteredSQQQ);
+    const broker = new BacktestBroker(capital);
+    const params = createDefaultStrategyParams();
+    const runner = new BacktestRunner(dataFeed, broker, params);
+
+    const { firstDate, lastDate } = dataFeed.getAvailableDateRange();
+
+    return runner.run({
+        startDate: firstDate,
+        endDate: lastDate,
+        initialCapital: capital,
+        displayFrom
+    });
 }
 
 async function main() {
