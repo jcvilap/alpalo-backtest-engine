@@ -133,7 +133,9 @@ function DashboardContent() {
 
                     // Only update state and run if dates actually changed or no results yet
                     const datesChanged = newStart !== startDate || newEnd !== endDate;
-                    if (datesChanged || !result) {
+
+                    // Prevent double-execution: if loading, we are likely already running the backtest for this range
+                    if (datesChanged || (!result && !loading)) {
                         setStartDate(newStart);
                         setEndDate(newEnd);
                         setSelectedRange(parsed.range as DateRangeKey);
@@ -254,17 +256,9 @@ function DashboardContent() {
     };
 
     const handleRangeSelect = (range: string) => {
-        // Always use today as the anchor for predefined ranges
-        const { startDate: newStart, endDate: newEnd } = getDateRange(range as DateRangeKey);
-
-        setStartDate(newStart);
-        setEndDate(newEnd);
-        setSelectedRange(range);
+        // Only update URL. The useEffect hook will handle state updates and running the backtest.
+        // This prevents race conditions where useEffect sees the old URL and reverts the state.
         updateUrl(range);
-
-        if (newStart && newEnd) {
-            runBacktest(newStart, newEnd, range);
-        }
     };
 
     return (
