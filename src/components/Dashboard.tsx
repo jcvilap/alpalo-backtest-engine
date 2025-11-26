@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { getDateRange, DATE_RANGE_OPTIONS, getNYNow, formatNYDate, DateRangeKey } from '@/lib/utils/dateUtils';
 import { Calendar, Play, Activity, AlertTriangle, BarChart2, List, Terminal } from 'lucide-react';
 import { BacktestResult } from '@/lib/backtest/backtestEngine';
@@ -11,6 +11,7 @@ import MonthlyPerformanceMatrix from './MonthlyPerformanceMatrix';
 import { printBacktestResult, CliLine } from '@/lib/utils/resultPrinter';
 import CliOutput from './CliOutput';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 function DashboardContent() {
     const searchParams = useSearchParams();
@@ -27,6 +28,7 @@ function DashboardContent() {
     const [cliLines, setCliLines] = useState<CliLine[]>([]);
     const [selectedRange, setSelectedRange] = useState<string | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
+    const resultCache = useRef<Record<string, BacktestResult>>({});
 
     // Auto-populate dates from cache
     useEffect(() => {
@@ -204,6 +206,16 @@ function DashboardContent() {
             return;
         }
 
+        const cacheKey = `${start}:${end}`;
+        const cachedResult = resultCache.current[cacheKey];
+
+        if (cachedResult) {
+            setError(null);
+            setResult(cachedResult);
+            setCliLines(rangeLabel ? printBacktestResult(cachedResult, start, end, 1000000, { mode: 'capture' }) : []);
+            return;
+        }
+
         setLoading(true);
         setError(null);
         setResult(null);
@@ -231,6 +243,7 @@ function DashboardContent() {
             }
 
             const data = await res.json();
+            resultCache.current[cacheKey] = data;
             setResult(data);
 
             // Print to console if a predefined range was selected
@@ -255,10 +268,10 @@ function DashboardContent() {
         updateUrl(undefined, tab);
     };
 
-    const handleRangeSelect = (range: string) => {
-        // Only update URL. The useEffect hook will handle state updates and running the backtest.
-        // This prevents race conditions where useEffect sees the old URL and reverts the state.
-        updateUrl(range);
+    const buildRangeHref = (range: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('range', range);
+        return `${pathname}?${params.toString()}`;
     };
 
     return (
@@ -412,15 +425,24 @@ function DashboardContent() {
                         {DATE_RANGE_OPTIONS.map((range) => {
                             const isSelected = selectedRange === range;
                             const isDisabled = loading || isSelected;
+                            const href = buildRangeHref(range);
                             return (
-                                <button
+                                <Link
                                     key={range}
-                                    onClick={() => handleRangeSelect(range)}
-                                    disabled={isDisabled}
-                                    className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ' + (isDisabled ? 'cursor-not-allowed ' : '') + (isSelected ? 'bg-blue-600 text-white border-blue-600 opacity-90' : loading ? 'opacity-50 text-gray-700 bg-white border-gray-300' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400')}
+                                    href={href}
+                                    scroll={false}
+                                    prefetch={false}
+                                    onClick={(e) => {
+                                        if (isDisabled) {
+                                            e.preventDefault();
+                                        }
+                                    }}
+                                    aria-disabled={isDisabled}
+                                    tabIndex={isDisabled ? -1 : 0}
+                                    className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors inline-flex items-center justify-center ' + (isDisabled ? 'cursor-not-allowed ' : '') + (isSelected ? 'bg-blue-600 text-white border-blue-600 opacity-90' : loading ? 'opacity-50 text-gray-700 bg-white border-gray-300' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400')}
                                 >
                                     {range}
-                                </button>
+                                </Link>
                             );
                         })}
                     </div>
