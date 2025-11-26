@@ -57,7 +57,8 @@ export function getConfiguredAccounts(): AccountConfig[] {
                 validateAccounts(accounts);
                 return accounts;
             }
-        } catch (error: any) {
+        } catch (error) {
+            // @ts-ignore
             console.warn(`Failed to parse TRADING_ACCOUNTS_CONFIG: ${error.message}`);
         }
     }
