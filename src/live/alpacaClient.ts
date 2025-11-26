@@ -227,11 +227,13 @@ export class AlpacaClient {
     async getAccount(): Promise<AlpacaAccount> {
         try {
             return await this.api.getAccount() as unknown as AlpacaAccount;
-        } catch (error: any) {
+        } catch (error: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
             throw new AlpacaError(
-                error.message || 'Failed to get account',
-                error.response?.status,
-                error.response?.data
+                err.message || 'Failed to get account',
+                err.response?.status,
+                err.response?.data
             );
         }
     }
@@ -244,11 +246,13 @@ export class AlpacaClient {
     async getPositions(): Promise<AlpacaPosition[]> {
         try {
             return await this.api.getPositions() as unknown as AlpacaPosition[];
-        } catch (error: any) {
+        } catch (error: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
             throw new AlpacaError(
-                error.message || 'Failed to get positions',
-                error.response?.status,
-                error.response?.data
+                err.message || 'Failed to get positions',
+                err.response?.status,
+                err.response?.data
             );
         }
     }
@@ -262,15 +266,17 @@ export class AlpacaClient {
     async getPosition(symbol: string): Promise<AlpacaPosition | null> {
         try {
             return await this.api.getPosition(symbol) as unknown as AlpacaPosition;
-        } catch (error: any) {
+        } catch (error: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
             // Return null if position doesn't exist (404)
-            if (error.response?.status === 404) {
+            if (err.response?.status === 404) {
                 return null;
             }
             throw new AlpacaError(
-                error.message || `Failed to get position for ${symbol}`,
-                error.response?.status,
-                error.response?.data
+                err.message || `Failed to get position for ${symbol}`,
+                err.response?.status,
+                err.response?.data
             );
         }
     }
@@ -283,12 +289,15 @@ export class AlpacaClient {
      */
     async submitOrder(order: AlpacaOrderRequest): Promise<AlpacaOrder> {
         try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return await this.api.createOrder(order as any) as unknown as AlpacaOrder;
-        } catch (error: any) {
+        } catch (error: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
             throw new AlpacaError(
-                error.message || 'Failed to submit order',
-                error.response?.status,
-                error.response?.data
+                err.message || 'Failed to submit order',
+                err.response?.status,
+                err.response?.data
             );
         }
     }
@@ -303,11 +312,13 @@ export class AlpacaClient {
     async getClock(): Promise<AlpacaClock> {
         try {
             return await this.api.getClock() as unknown as AlpacaClock;
-        } catch (error: any) {
+        } catch (error: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
             throw new AlpacaError(
-                error.message || 'Failed to get market clock',
-                error.response?.status,
-                error.response?.data
+                err.message || 'Failed to get market clock',
+                err.response?.status,
+                err.response?.data
             );
         }
     }
@@ -321,11 +332,13 @@ export class AlpacaClient {
     async cancelOrder(orderId: string): Promise<void> {
         try {
             await this.api.cancelOrder(orderId);
-        } catch (error: any) {
+        } catch (error: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
             throw new AlpacaError(
-                error.message || `Failed to cancel order ${orderId}`,
-                error.response?.status,
-                error.response?.data
+                err.message || `Failed to cancel order ${orderId}`,
+                err.response?.status,
+                err.response?.data
             );
         }
     }
@@ -339,12 +352,15 @@ export class AlpacaClient {
      */
     async getOrders(status: 'open' | 'closed' | 'all' = 'open', limit: number = 50): Promise<AlpacaOrder[]> {
         try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return await this.api.getOrders({ status, limit } as any) as unknown as AlpacaOrder[];
-        } catch (error: any) {
+        } catch (error: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
             throw new AlpacaError(
-                error.message || 'Failed to get orders',
-                error.response?.status,
-                error.response?.data
+                err.message || 'Failed to get orders',
+                err.response?.status,
+                err.response?.data
             );
         }
     }
