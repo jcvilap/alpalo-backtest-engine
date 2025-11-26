@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 @theme {
-  --font-geist-sans: "Geist Sans", sans-serif;
-  --font-geist-mono: "Geist Mono", monospace;
+  /* Fonts */
+  --font-family-display: var(--font-geist-sans);
+  --font-family-mono: var(--font-geist-mono);
+
+  /* Light theme colors */
+  --color-background: #f9fafb;
+  --color-foreground: #111827;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #f3f4f6;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-accent: #8b5cf6;
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #9ca3af;
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+  --color-success: #10b981;
+  --color-success-text: #047857;
+  --color-success-bg: #d1fae5;
+  --color-danger: #ef4444;
+  --color-danger-text: #dc2626;
+  --color-danger-bg: #fee2e2;
+  --color-gradient-page: linear-gradient(to bottom right, #f3f4f6, #e5e7eb);
+  --color-transition-theme: all 300ms ease-in-out;
+}
+
+.dark {
+  --color-background: #0f172a;
+  --color-foreground: #f1f5f9;
+  --color-surface: #1e293b;
+  --color-surface-elevated: #334155;
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-accent: #a78bfa;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-tertiary: #64748b;
+  --color-border: #334155;
+  --color-border-light: #475569;
+  --color-success: #34d399;
+  --color-success-text: #10b981;
+  --color-success-bg: #064e3b;
+  --color-danger: #f87171;
+  --color-danger-text: #ef4444;
+  --color-danger-bg: #7f1d1d;
+  --color-gradient-page: linear-gradient(to bottom right, #1e293b, #0f172a);
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  color: var(--color-foreground);
+  background: var(--color-background);
   font-family: var(--font-geist-sans);
+  transition: var(--transition-theme);
 }
 
 /* Remove focus ring from date inputs */
@@ -43,4 +87,50 @@ input[type="date"]:focus {
 
 .animate-slide-down {
   animation: slide-down 0.3s ease-out;
+}
+
+/* Theme transition utilities */
+.transition-theme {
+  transition: var(--transition-theme);
+}
+
+/* Utility classes using design tokens */
+.bg-surface {
+  background-color: var(--color-surface);
+}
+
+.bg-surface-elevated {
+  background-color: var(--color-surface-elevated);
+}
+
+.bg-gradient-page {
+  background: var(--gradient-page);
+}
+
+.text-text-primary {
+  color: var(--color-text-primary);
+}
+
+.text-text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-text-tertiary {
+  color: var(--color-text-tertiary);
+}
+
+.border-border {
+  border-color: var(--color-border);
+}
+
+.border-border-light {
+  border-color: var(--color-border-light);
+}
+
+.bg-primary {
+  background-color: var(--color-primary);
+}
+
+.hover\:bg-primary-hover:hover {
+  background-color: var(--color-primary-hover);
 }
