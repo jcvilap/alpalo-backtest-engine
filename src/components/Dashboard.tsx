@@ -100,8 +100,10 @@ function DashboardContent() {
     useEffect(() => {
         if (!isInitialized || !startDate || !endDate) return;
 
-        // Only check if there's no currently selected range (to avoid overriding user's predefined selection)
-        if (!selectedRange) {
+        // Only check if there's no currently selected range AND no range in URL
+        // This prevents overriding user's explicit range selection
+        const currentRangeParam = searchParams.get('range');
+        if (!selectedRange && !currentRangeParam) {
             const matchingRange = findMatchingPredefinedRange(startDate, endDate);
             if (matchingRange) {
                 setSelectedRange(matchingRange);
@@ -126,15 +128,21 @@ function DashboardContent() {
 
             if (parsed.type === 'predefined') {
                 // Valid predefined range
-                if (parsed.range !== selectedRange) {
+                if (parsed.range !== selectedRange || !result) {
                     const { startDate: newStart, endDate: newEnd } = getDateRange(parsed.range as DateRangeKey);
 
-                    setStartDate(newStart);
-                    setEndDate(newEnd);
-                    setSelectedRange(parsed.range as DateRangeKey);
+                    // Only update state and run if dates actually changed or no results yet
+                    const datesChanged = newStart !== startDate || newEnd !== endDate;
+                    if (datesChanged || !result) {
+                        setStartDate(newStart);
+                        setEndDate(newEnd);
+                        setSelectedRange(parsed.range as DateRangeKey);
 
-                    // Run backtest automatically
-                    runBacktest(newStart, newEnd, parsed.range);
+                        // Run backtest only if dates changed or no results
+                        if (datesChanged || !result) {
+                            runBacktest(newStart, newEnd, parsed.range);
+                        }
+                    }
                 }
             } else if (parsed.type === 'custom') {
                 // Valid custom date range
@@ -407,16 +415,20 @@ function DashboardContent() {
                 <div className={'mb-6 ' + (result ? 'mt-6' : 'mt-4')}>
                     <p className="text-xs text-gray-500 mb-2 font-medium">Quick Select:</p>
                     <div className="flex flex-wrap gap-2">
-                        {DATE_RANGE_OPTIONS.map((range) => (
-                            <button
-                                key={range}
-                                onClick={() => handleRangeSelect(range)}
-                                disabled={loading}
-                                className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ' + (loading ? 'opacity-50 cursor-not-allowed ' : '') + (selectedRange === range ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400')}
-                            >
-                                {range}
-                            </button>
-                        ))}
+                        {DATE_RANGE_OPTIONS.map((range) => {
+                            const isSelected = selectedRange === range;
+                            const isDisabled = loading || isSelected;
+                            return (
+                                <button
+                                    key={range}
+                                    onClick={() => handleRangeSelect(range)}
+                                    disabled={isDisabled}
+                                    className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ' + (isDisabled ? 'cursor-not-allowed ' : '') + (isSelected ? 'bg-blue-600 text-white border-blue-600 opacity-90' : loading ? 'opacity-50 text-gray-700 bg-white border-gray-300' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400')}
+                                >
+                                    {range}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 

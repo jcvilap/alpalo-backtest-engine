@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { PolygonClient } from '@/lib/polygon/client';
-import { BacktestEngine } from '@/lib/backtest/backtestEngine';
 import { fetchBacktestData } from '@/lib/backtest/dataFetcher';
+import { BacktestDataFeed } from '@/backtest/BacktestDataFeed';
+import { BacktestBroker } from '@/backtest/BacktestBroker';
+import { BacktestRunner } from '@/backtest/BacktestRunner';
+import { createDefaultStrategyParams } from '@/strategy/engine';
 
 export async function POST(request: Request) {
     try {
@@ -30,12 +33,22 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No data available for TQQQ' }, { status: 404 });
         }
 
-        // Run backtest
         const capital = 1_000_000;
         console.log('[BACKTEST API] Running backtest with capital:', capital);
 
-        const engine = new BacktestEngine(capital);
-        const result = engine.run(qqqData, tqqqData, sqqqData, displayFrom);
+        const dataFeed = new BacktestDataFeed(qqqData, tqqqData, sqqqData);
+        const broker = new BacktestBroker(capital);
+        const params = createDefaultStrategyParams();
+        const runner = new BacktestRunner(dataFeed, broker, params);
+
+        const { firstDate, lastDate } = dataFeed.getAvailableDateRange();
+
+        const result = await runner.run({
+            startDate: firstDate,
+            endDate: lastDate,
+            initialCapital: capital,
+            displayFrom
+        });
 
         console.log('[BACKTEST API] Backtest complete:', {
             totalReturn: result.metrics.totalReturn.toFixed(2),
