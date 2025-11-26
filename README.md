@@ -2,7 +2,7 @@
 
 [**Live Demo**](https://alpalo-backtest-engine.vercel.app)
 
-A professional-grade backtesting platform for analyzing trading strategies with historical market data. Built with Next.js, TypeScript, and modern data visualization tools to provide comprehensive performance analytics.
+A professional-grade trading system with backtesting, paper trading, and live trading capabilities. Built with Next.js, TypeScript, and modern data visualization tools to provide comprehensive performance analytics and automated trading execution.
 
 ## Demo
 
@@ -35,8 +35,9 @@ A professional-grade backtesting platform for analyzing trading strategies with 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
+- Node.js 18+
 - Polygon API key (for market data)
+- Alpaca API credentials (for paper/live trading)
 
 ### Installation
 
@@ -49,7 +50,24 @@ cd alpalo-backtest-engine
 npm install
 
 # Configure environment variables
-echo "POLYGON_API_KEY=your_api_key_here" > .env.local
+cat > .env.local << EOF
+# Required: Polygon API for market data
+POLYGON_API_KEY=your_polygon_api_key_here
+
+# Trading Mode (BACKTEST | PAPER | LIVE)
+TRADING_MODE=BACKTEST
+
+# Paper Trading Credentials (optional, for PAPER mode)
+PAPER_ALPACA_KEY_ID=your_paper_key_id
+PAPER_ALPACA_SECRET_KEY=your_paper_secret_key
+
+# Live Trading Credentials (optional, for LIVE mode)
+LIVE_ALPACA_KEY_ID=your_live_key_id
+LIVE_ALPACA_SECRET_KEY=your_live_secret_key
+
+# Slack Notifications (optional)
+SLACK_WEBHOOK_URL=your_slack_webhook_url
+EOF
 
 # Prefetch historical data (run once)
 npx tsx scripts/prefetch.ts
@@ -62,20 +80,83 @@ Open [http://localhost:3003](http://localhost:3003) to view the application.
 
 ## Usage
 
+### Backtesting Mode (Default)
+
 1. **Select Date Range**: Choose start and end dates for your backtest period (data available from 2015-2025)
 2. **Run Backtest**: Click "Run Backtest" to execute the analysis
 3. **Review Results**: Explore performance metrics, equity curves, trade logs, and monthly returns across three tabs
+
+### Trading Modes
+
+The system supports three operating modes, configured via the `TRADING_MODE` environment variable:
+
+#### 1. BACKTEST (Default)
+- Analyzes historical performance using cached market data
+- No real money involved
+- Fast execution with pre-loaded data
+- Ideal for strategy testing and optimization
+
+```bash
+TRADING_MODE=BACKTEST npm run dev
+```
+
+#### 2. PAPER
+- Simulated trading with live market data
+- Orders are executed via Alpaca's paper trading API
+- No real money at risk
+- Full trading simulation for strategy validation
+
+```bash
+# Set environment variables
+TRADING_MODE=PAPER
+PAPER_ALPACA_KEY_ID=your_paper_key
+PAPER_ALPACA_SECRET_KEY=your_paper_secret
+
+npm run dev
+```
+
+#### 3. LIVE
+- Real trading with actual capital
+- Orders executed on live markets via Alpaca API
+- ⚠️ **USE WITH CAUTION** - Real money at risk
+- Requires live trading credentials
+
+```bash
+# Set environment variables
+TRADING_MODE=LIVE
+LIVE_ALPACA_KEY_ID=your_live_key
+LIVE_ALPACA_SECRET_KEY=your_live_secret
+
+npm run dev
+```
 
 ## Project Structure
 
 ```
 ├── cache/              # Cached historical market data
-├── scripts/            # Data fetching utilities
+├── scripts/            # Data fetching and testing utilities
 ├── src/
 │   ├── app/           # Next.js app directory
 │   │   └── api/       # Backend API routes
+│   ├── backtest/      # Backtesting implementation
+│   │   ├── BacktestDataFeed.ts    # Historical data adapter
+│   │   ├── BacktestBroker.ts      # Simulated order execution
+│   │   └── BacktestRunner.ts      # Backtest orchestration
 │   ├── components/    # React UI components
-│   └── lib/           # Core logic (strategy, backtest engine, data client)
+│   ├── config/        # Configuration and environment management
+│   │   ├── env.ts                 # Trading mode configuration
+│   │   └── secrets.ts             # API credentials management
+│   ├── lib/           # Core logic (strategy, backtest engine, data client)
+│   ├── live/          # Live and paper trading implementation
+│   │   ├── PolygonLiveDataFeed.ts # Live market data adapter
+│   │   ├── alpacaClient.ts        # Alpaca REST API client
+│   │   └── LiveRunner.ts          # Live trading orchestration
+│   ├── ports/         # Interface definitions (Ports & Adapters pattern)
+│   │   ├── DataFeed.ts            # Data source interface
+│   │   └── Broker.ts              # Order execution interface
+│   └── strategy/      # Pure strategy engine
+│       ├── engine.ts              # Core strategy logic
+│       └── types.ts               # Strategy type definitions
 └── package.json
 ```
 

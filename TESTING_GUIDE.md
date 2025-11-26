@@ -677,16 +677,218 @@ The backtest is working correctly if:
 
 ---
 
-## Next Steps
+## Step 15: Testing Trading Modes
 
-After successful testing:
-- Experiment with different date ranges
-- Analyze specific market periods (2020 crash, 2021 rally, etc.)
-- Compare strategy vs benchmarks across different timeframes
-- Review trade log for position sizing patterns
-- Export results (feature to be added)
+### Overview
+The system supports three trading modes: BACKTEST (default), PAPER, and LIVE. This section covers testing each mode.
 
 ---
 
-**Last Updated**: 2025-11-22
-**Version**: 1.0.0
+### Testing BACKTEST Mode (Default)
+
+All previous steps (1-14) cover backtest mode testing. This is the default mode and requires only the Polygon API key.
+
+**Environment Variables:**
+```bash
+TRADING_MODE=BACKTEST
+POLYGON_API_KEY=your_polygon_key
+```
+
+**Verification:**
+- [ ] System uses cached historical data
+- [ ] No Alpaca credentials required
+- [ ] Fast execution (uses pre-loaded data)
+
+---
+
+### Testing PAPER Mode
+
+Paper mode simulates live trading with real market data but no actual money at risk.
+
+#### Action
+1. Add paper trading credentials to `.env.local`:
+```bash
+TRADING_MODE=PAPER
+POLYGON_API_KEY=your_polygon_key
+PAPER_ALPACA_KEY_ID=your_paper_key_id
+PAPER_ALPACA_SECRET_KEY=your_paper_secret_key
+```
+
+2. Test the Alpaca client:
+```bash
+npx tsx scripts/test-alpaca.ts
+```
+
+#### Expected Output
+```
+Testing Alpaca client...
+✓ Alpaca client created (paper trading mode)
+
+Test 1: Fetching account information...
+✓ Account fetched successfully
+  Account ID: xxx
+  Status: ACTIVE
+  Cash: $100,000.00
+  Portfolio Value: $100,000.00
+  Buying Power: $400,000.00
+
+Test 2: Fetching market clock...
+✓ Market clock fetched successfully
+  Market Open: Yes/No
+  Current Time: 2025-11-26T14:30:00Z
+  Next Open: 2025-11-27T14:30:00Z
+  Next Close: 2025-11-26T21:00:00Z
+
+Test 3: Fetching current positions...
+✓ Positions fetched successfully (0 positions)
+  No positions currently held
+
+Test 4: Fetching open orders...
+✓ Orders fetched successfully (0 open orders)
+  No open orders
+
+✅ All tests passed!
+```
+
+#### Verification
+- [ ] Account information retrieved successfully
+- [ ] Market clock shows correct open/close times
+- [ ] Positions and orders can be fetched
+- [ ] No authentication errors
+
+#### Common Issues
+- **Error: "Invalid credentials"** → Check your PAPER_ALPACA_KEY_ID and PAPER_ALPACA_SECRET_KEY
+- **Error: "Request failed"** → Verify internet connection and Alpaca API status
+- **403 Forbidden** → Credentials may be for live trading instead of paper trading
+
+---
+
+### Testing LIVE Mode
+
+⚠️ **WARNING: LIVE mode trades real money. Use extreme caution.**
+
+#### Prerequisites
+- Funded Alpaca brokerage account
+- Live trading API credentials
+- Thorough testing in PAPER mode first
+- Understanding of strategy behavior and risks
+
+#### Action
+1. Add live trading credentials to `.env.local`:
+```bash
+TRADING_MODE=LIVE
+POLYGON_API_KEY=your_polygon_key
+LIVE_ALPACA_KEY_ID=your_live_key_id
+LIVE_ALPACA_SECRET_KEY=your_live_secret_key
+```
+
+2. Test the Alpaca client (similar to paper mode):
+```bash
+TRADING_MODE=LIVE npx tsx scripts/test-alpaca.ts
+```
+
+#### Expected Output
+Similar to paper mode, but with your actual account balances.
+
+#### Verification
+- [ ] Account balance matches your actual Alpaca account
+- [ ] Market clock shows correct status
+- [ ] Positions reflect your actual holdings
+- [ ] Orders show your actual pending orders
+
+#### Safety Checklist
+Before running in LIVE mode:
+- [ ] Thoroughly tested in PAPER mode for at least 30 days
+- [ ] Reviewed all trade history from paper trading
+- [ ] Understand max drawdown and risk exposure
+- [ ] Set up position limits and stop losses
+- [ ] Have Slack notifications configured (optional but recommended)
+- [ ] Monitor the system actively during initial live runs
+- [ ] Start with a small account size
+
+#### Common Issues
+- **Error: "Insufficient buying power"** → Account doesn't have enough funds
+- **Error: "Market is closed"** → Attempting to trade outside market hours
+- **Error: "Position limit exceeded"** → Alpaca account restrictions
+
+---
+
+### Testing PolygonLiveDataFeed
+
+The PolygonLiveDataFeed fetches real-time data from Polygon for paper and live trading modes.
+
+#### Action
+Create a test script `scripts/test-polygon-feed.ts`:
+```typescript
+import { PolygonLiveDataFeed } from '../src/live/PolygonLiveDataFeed';
+import { formatNYDate, getNYNow } from '../src/lib/utils/dateUtils';
+
+async function testPolygonFeed() {
+    const feed = new PolygonLiveDataFeed();
+    const today = formatNYDate(getNYNow());
+
+    console.log(`Fetching snapshot for ${today}...`);
+    const snapshot = await feed.getSnapshotForDate(today);
+
+    if (snapshot) {
+        console.log('✓ Snapshot fetched successfully');
+        console.log(`  QQQ history length: ${snapshot.qqqHistory.length} days`);
+        console.log(`  TQQQ price: $${snapshot.prices.TQQQ}`);
+        console.log(`  SQQQ price: $${snapshot.prices.SQQQ}`);
+    } else {
+        console.error('✗ Failed to fetch snapshot');
+    }
+}
+
+testPolygonFeed();
+```
+
+Run:
+```bash
+npx tsx scripts/test-polygon-feed.ts
+```
+
+#### Expected Output
+```
+Fetching snapshot for 2025-11-26...
+✓ Snapshot fetched successfully
+  QQQ history length: 250 days
+  TQQQ price: $85.42
+  SQQQ price: $6.78
+```
+
+#### Verification
+- [ ] QQQ history contains 200+ days of data
+- [ ] TQQQ and SQQQ prices are reasonable
+- [ ] Snapshot includes all required fields
+- [ ] No API errors
+
+---
+
+### Configuration Summary
+
+| Mode | Required Variables | Use Case |
+|------|-------------------|----------|
+| **BACKTEST** | `POLYGON_API_KEY` | Historical analysis, no trading |
+| **PAPER** | `POLYGON_API_KEY`<br>`PAPER_ALPACA_KEY_ID`<br>`PAPER_ALPACA_SECRET_KEY` | Simulated trading, no risk |
+| **LIVE** | `POLYGON_API_KEY`<br>`LIVE_ALPACA_KEY_ID`<br>`LIVE_ALPACA_SECRET_KEY` | Real trading, real money |
+
+Optional for all modes:
+- `SLACK_WEBHOOK_URL` - For trade notifications
+
+---
+
+## Next Steps
+
+After successful testing:
+- Experiment with different date ranges in BACKTEST mode
+- Test paper trading for at least 30 days before going live
+- Analyze specific market periods (2020 crash, 2021 rally, etc.)
+- Compare strategy vs benchmarks across different timeframes
+- Review trade log for position sizing patterns
+- Set up monitoring and alerts for live trading
+
+---
+
+**Last Updated**: 2025-11-26
+**Version**: 2.0.0
