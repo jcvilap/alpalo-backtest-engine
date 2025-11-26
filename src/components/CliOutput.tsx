@@ -38,15 +38,16 @@ export default function CliOutput({ lines }: CliOutputProps) {
                 </div>
                 <div className="ml-2 text-xs text-gray-400 flex items-center gap-1.5">
                     <Terminal className="w-3 h-3" />
-                    <span>alpalo-cli — backtest</span>
+                    <span className="hidden sm:inline">alpalo-cli — backtest</span>
+                    <span className="sm:hidden">backtest</span>
                 </div>
             </div>
 
             {/* Terminal Content */}
-            <div className="p-6 overflow-x-auto">
-                <div className="min-w-max">
+            <div className="p-4 sm:p-6 overflow-x-auto max-w-full">
+                <div className="inline-block min-w-full">
                     {lines.map((line, i) => (
-                        <div key={i} className="whitespace-pre">
+                        <div key={i} className="whitespace-pre text-xs sm:text-sm">
                             {line.segments.map((segment, j) => {
                                 const colorClass = segment.color ? COLOR_MAP[segment.color] : COLOR_MAP.reset;
                                 return (

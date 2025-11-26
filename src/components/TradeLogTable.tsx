@@ -13,41 +13,41 @@ const TradeLogTable = React.memo(({ trades }: TradeLogTableProps) => {
     }, []);
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100">
-                <h2 className="text-lg font-bold text-gray-900">Trade Log</h2>
+        <div className="bg-surface rounded-2xl shadow-sm border border-border-light overflow-hidden transition-theme">
+            <div className="p-6 border-b border-border-light transition-theme">
+                <h2 className="text-lg font-bold text-text-primary transition-theme">Trade Log</h2>
             </div>
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                <table className="min-w-full divide-y divide-gray-200 relative">
-                    <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
+                <table className="min-w-full divide-y divide-border relative">
+                    <thead className="bg-surface-elevated sticky top-0 z-10 shadow-sm transition-theme">
                         <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entry Date</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exit Date</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbol</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Position %</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Days</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Trade Return %</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Portfolio Return %</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider transition-theme">Entry Date</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider transition-theme">Exit Date</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider transition-theme">Symbol</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wider transition-theme">Position %</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wider transition-theme">Days</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wider transition-theme">Trade Return %</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wider transition-theme">Portfolio Return %</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-surface divide-y divide-border transition-theme">
                         {trades.map((trade, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatDate(trade.entryDate)}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{trade.exitDate ? formatDate(trade.exitDate) : '-'}</td>
+                            <tr key={idx} className="hover:bg-surface-elevated transition-theme">
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-text-primary transition-theme">{formatDate(trade.entryDate)}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-text-primary transition-theme">{trade.exitDate ? formatDate(trade.exitDate) : '-'}</td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm">
-                                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-surface-elevated text-text-primary transition-theme">
                                         {trade.symbol}
                                     </span>
                                 </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-text-primary transition-theme">
                                     {trade.positionSizePct ? `${trade.positionSizePct.toFixed(1)}%` : '-'}
                                 </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">{trade.daysHeld || '-'}</td>
-                                <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${(trade.returnPct || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-text-primary transition-theme">{trade.daysHeld || '-'}</td>
+                                <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium transition-theme ${(trade.returnPct || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
                                     {trade.returnPct ? `${trade.returnPct.toFixed(2)}%` : '-'}
                                 </td>
-                                <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${(trade.portfolioReturnPct || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium transition-theme ${(trade.portfolioReturnPct || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
                                     {trade.portfolioReturnPct ? `${trade.portfolioReturnPct.toFixed(2)}%` : '-'}
                                 </td>
                             </tr>

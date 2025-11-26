@@ -12,6 +12,7 @@ import { printBacktestResult, CliLine } from '@/lib/utils/resultPrinter';
 import CliOutput from './CliOutput';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import ThemeToggle from './ThemeToggle';
 
 function DashboardContent() {
     const searchParams = useSearchParams();
@@ -275,20 +276,23 @@ function DashboardContent() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="min-h-screen bg-gradient-page transition-theme">
             {/* Sticky Header - shown when results are loaded */}
             {result && (
-                <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-md animate-slide-down">
-                    <div className="max-w-[1400px] mx-auto px-6 py-3">
-                        <div className="flex items-center justify-between gap-4">
+                <div className="sticky top-0 z-50 bg-surface border-b border-border shadow-md animate-slide-down transition-theme">
+                    <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-2 sm:py-3">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4">
                             {/* Title */}
-                            <div className="flex items-center gap-2">
-                                <Activity className="w-6 h-6 text-blue-600" />
-                                <h1 className="text-xl font-bold text-gray-900">Alpalo Backtest Engine</h1>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-primary transition-theme flex-shrink-0" />
+                                <h1 className="text-base sm:text-xl font-bold text-text-primary transition-theme truncate">Alpalo Backtest Engine</h1>
                             </div>
 
                             {/* Condensed Inputs */}
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                    <ThemeToggle />
+                                </div>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="date"
@@ -303,10 +307,10 @@ function DashboardContent() {
                                                 updateUrl(undefined, undefined, newStart, endDate);
                                             }
                                         }}
-                                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary min-w-[120px]"
                                     />
                                 </div>
-                                <span className="text-gray-400">→</span>
+                                <span className="text-text-tertiary transition-theme hidden sm:inline">→</span>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="date"
@@ -320,15 +324,15 @@ function DashboardContent() {
                                                 updateUrl(undefined, undefined, startDate, newEnd);
                                             }
                                         }}
-                                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary min-w-[120px]"
                                     />
                                 </div>
                                 <button
                                     onClick={() => runBacktest()}
                                     disabled={loading}
-                                    className={'px-4 py-1.5 text-sm rounded-lg font-semibold transition-all flex items-center gap-2 ' + (loading ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white')}
+                                    className={'px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-lg font-semibold transition-theme flex items-center gap-1.5 sm:gap-2 whitespace-nowrap ' + (loading ? 'bg-gray-300 cursor-not-allowed text-gray-600' : 'bg-primary hover:bg-primary-hover text-white')}
                                 >
-                                    <Play className="w-4 h-4" />
+                                    <Play className="w-3 h-3 sm:w-4 sm:h-4" />
                                     {loading ? 'Running...' : 'Run'}
                                 </button>
                             </div>
@@ -341,13 +345,16 @@ function DashboardContent() {
                 {/* Initial Header - hidden when results are loaded */}
                 {!result && (
                     <div className="mb-8">
-                        <div className="flex items-center gap-3 mb-2">
-                            <Activity className="w-8 h-8 text-blue-600" />
-                            <h1 className="text-4xl font-bold text-gray-900">Alpalo Backtest Engine</h1>
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                                <Activity className="w-8 h-8 text-primary transition-theme" />
+                                <h1 className="text-4xl font-bold text-text-primary transition-theme">Alpalo Backtest Engine</h1>
+                            </div>
+                            <ThemeToggle />
                         </div>
-                        <p className="text-gray-600 text-lg">Leveraged ETF Momentum Strategy</p>
+                        <p className="text-text-secondary text-lg transition-theme">Leveraged ETF Momentum Strategy</p>
                         <div className="relative group inline-block mt-2">
-                            <div className="text-xs text-gray-500 cursor-help flex items-center gap-1">
+                            <div className="text-xs text-text-tertiary cursor-help flex items-center gap-1 transition-theme">
                                 {/* Omitted for brevity - Strategy info tooltip */}
                             </div>
                         </div>
@@ -356,10 +363,10 @@ function DashboardContent() {
 
                 {/* Input Panel - hidden when results are loaded */}
                 {!result && (
-                    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
+                    <div className="bg-surface rounded-2xl shadow-lg border border-border-light p-6 mb-8 transition-theme">
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
+                                <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">Start Date</label>
                                 <div className="relative">
                                     <input
                                         type="date"
@@ -374,12 +381,12 @@ function DashboardContent() {
                                                 updateUrl(undefined, undefined, newStart, endDate);
                                             }
                                         }}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary"
                                     />
                                 </div>
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
+                                <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">End Date</label>
                                 <div className="relative">
                                     <input
                                         type="date"
@@ -393,7 +400,7 @@ function DashboardContent() {
                                                 updateUrl(undefined, undefined, startDate, newEnd);
                                             }
                                         }}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary"
                                     />
                                 </div>
                             </div>
@@ -401,7 +408,7 @@ function DashboardContent() {
                                 <button
                                     onClick={() => runBacktest()}
                                     disabled={loading}
-                                    className={'w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ' + (loading ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl')}
+                                    className={'w-full py-3 rounded-xl font-semibold transition-theme flex items-center justify-center gap-2 shadow-lg hover:shadow-xl ' + (loading ? 'bg-gray-300 cursor-not-allowed text-gray-600' : 'bg-primary hover:bg-primary-hover text-white')}
                                 >
                                     <Play className="w-5 h-5" />
                                     {loading ? 'Running...' : 'Run Backtest'}
@@ -410,9 +417,9 @@ function DashboardContent() {
                         </div>
 
                         {error && (
-                            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-                                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                <p className="text-red-800 text-sm">{error}</p>
+                            <div className="mt-4 p-4 bg-danger-bg border border-danger rounded-xl flex items-start gap-3 transition-theme">
+                                <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5 transition-theme" />
+                                <p className="text-danger-text text-sm transition-theme">{error}</p>
                             </div>
                         )}
                     </div>
@@ -420,7 +427,7 @@ function DashboardContent() {
 
                 {/* Predefined Date Range Buttons - Always Visible */}
                 <div className={'mb-6 ' + (result ? 'mt-6' : 'mt-4')}>
-                    <p className="text-xs text-gray-500 mb-2 font-medium">Quick Select:</p>
+                    <p className="text-xs text-text-tertiary mb-2 font-medium transition-theme">Quick Select:</p>
                     <div className="flex flex-wrap gap-2">
                         {DATE_RANGE_OPTIONS.map((range) => {
                             const isSelected = selectedRange === range;
@@ -439,7 +446,7 @@ function DashboardContent() {
                                     }}
                                     aria-disabled={isDisabled}
                                     tabIndex={isDisabled ? -1 : 0}
-                                    className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors inline-flex items-center justify-center ' + (isDisabled ? 'cursor-not-allowed ' : '') + (isSelected ? 'bg-blue-600 text-white border-blue-600 opacity-90' : loading ? 'opacity-50 text-gray-700 bg-white border-gray-300' : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400')}
+                                    className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-theme inline-flex items-center justify-center ' + (isDisabled ? 'cursor-not-allowed ' : '') + (isSelected ? 'bg-primary text-white border-primary opacity-90' : loading ? 'opacity-50 text-text-secondary bg-surface border-border' : 'text-text-primary bg-surface border-border hover:bg-surface-elevated hover:border-border')}
                                 >
                                     {range}
                                 </Link>
@@ -452,8 +459,8 @@ function DashboardContent() {
                 {loading && !result && (
                     <div className="flex items-center justify-center min-h-[400px]">
                         <div className="flex flex-col items-center gap-4">
-                            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                            <p className="text-blue-700 font-semibold text-lg animate-pulse">Running Backtest...</p>
+                            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-primary font-semibold text-lg animate-pulse transition-theme">Running Backtest...</p>
                         </div>
                     </div>
                 )}
@@ -462,33 +469,33 @@ function DashboardContent() {
                 {result && (
                     <div className="relative min-h-[400px]">
                         {loading && (
-                            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-40 flex items-center justify-center rounded-2xl">
+                            <div className="absolute inset-0 bg-surface/80 backdrop-blur-sm z-40 flex items-center justify-center rounded-2xl transition-theme">
                                 <div className="flex flex-col items-center gap-3">
-                                    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                    <p className="text-blue-700 font-medium animate-pulse">Running Backtest...</p>
+                                    <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                    <p className="text-primary font-medium animate-pulse transition-theme">Running Backtest...</p>
                                 </div>
                             </div>
                         )}
                         <div className="space-y-8">
                             {/* Tabs */}
-                            <div className="flex gap-2 border-b border-gray-200 mt-6">
+                            <div className="flex gap-2 border-b border-border mt-6 transition-theme">
                                 <button
                                     onClick={() => handleTabChange('overview')}
-                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ' + (activeTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900')}
+                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-theme ' + (activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
                                 >
                                     <BarChart2 className="w-4 h-4" />
                                     Overview
                                 </button>
                                 <button
                                     onClick={() => handleTabChange('trades')}
-                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ' + (activeTab === 'trades' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900')}
+                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-theme ' + (activeTab === 'trades' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
                                 >
                                     <List className="w-4 h-4" />
                                     Trades
                                 </button>
                                 <button
                                     onClick={() => handleTabChange('monthly')}
-                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ' + (activeTab === 'monthly' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900')}
+                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-theme ' + (activeTab === 'monthly' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
                                 >
                                     <Calendar className="w-4 h-4" />
                                     Monthly
@@ -496,7 +503,7 @@ function DashboardContent() {
                                 {selectedRange && cliLines.length > 0 && (
                                     <button
                                         onClick={() => handleTabChange('cli')}
-                                        className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-colors ' + (activeTab === 'cli' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-600 hover:text-gray-900')}
+                                        className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-theme ' + (activeTab === 'cli' ? 'border-success text-success' : 'border-transparent text-text-secondary hover:text-text-primary')}
                                     >
                                         <Terminal className="w-4 h-4" />
                                         CLI Output

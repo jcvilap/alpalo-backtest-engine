@@ -110,30 +110,30 @@ const MonthlyPerformanceMatrix = React.memo(({ equityCurve }: MonthlyPerformance
     }, [years, sortConfig, ytdReturns]);
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100">
-                <h2 className="text-lg font-bold text-gray-900">Monthly Performance Matrix</h2>
+        <div className="bg-surface rounded-2xl shadow-sm border border-border-light overflow-hidden transition-theme">
+            <div className="p-6 border-b border-border-light transition-theme">
+                <h2 className="text-lg font-bold text-text-primary transition-theme">Monthly Performance Matrix</h2>
             </div>
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                <table className="min-w-full divide-y divide-gray-200 relative">
-                    <thead className="bg-gray-50 sticky top-0 z-20 shadow-sm">
+                <table className="min-w-full divide-y divide-border relative">
+                    <thead className="bg-surface-elevated sticky top-0 z-20 shadow-sm transition-theme">
                         <tr>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer sticky left-0 bg-gray-50 z-30 border-r border-gray-200" onClick={() => setSortConfig({ key: 'year', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })}>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-text-tertiary uppercase tracking-wider cursor-pointer sticky left-0 bg-surface-elevated z-30 border-r border-border transition-theme" onClick={() => setSortConfig({ key: 'year', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })}>
                                 <div className="flex items-center justify-center gap-1">
                                     Year {sortConfig.key === 'year' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
                                 </div>
                             </th>
                             {months.map(month => (
-                                <th key={month} className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{month}</th>
+                                <th key={month} className="px-2 py-3 text-center text-xs font-medium text-text-tertiary uppercase tracking-wider transition-theme">{month}</th>
                             ))}
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer sticky right-0 bg-gray-50 z-30 border-l border-gray-200" onClick={() => setSortConfig({ key: 'ytdStrat', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })}>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-text-tertiary uppercase tracking-wider cursor-pointer sticky right-0 bg-surface-elevated z-30 border-l border-border transition-theme" onClick={() => setSortConfig({ key: 'ytdStrat', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })}>
                                 <div className="flex items-center justify-center gap-1">
                                     YTD {sortConfig.key === 'ytdStrat' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
                                 </div>
                             </th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-surface divide-y divide-border transition-theme">
                         {sortedYears.map(year => {
                             const ytd = ytdReturns[year];
                             const ytdStrat = ytd?.strategy || 0;
@@ -141,31 +141,31 @@ const MonthlyPerformanceMatrix = React.memo(({ equityCurve }: MonthlyPerformance
                             const ytdTQQQ = ytd?.benchmarkTQQQ || 0;
 
                             return (
-                                <tr key={year} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-4 py-4 text-center text-sm font-bold text-gray-900 sticky left-0 bg-white z-10 border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">{year}</td>
+                                <tr key={year} className="hover:bg-surface-elevated transition-theme">
+                                    <td className="px-4 py-4 text-center text-sm font-bold text-text-primary sticky left-0 bg-surface z-10 border-r border-border-light shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-theme">{year}</td>
                                     {months.map((_, monthIdx) => {
                                         const data = monthlyReturns[year][monthIdx];
                                         if (!data) {
-                                            return <td key={monthIdx} className="px-2 py-4 text-center text-gray-300 text-xs">-</td>;
+                                            return <td key={monthIdx} className="px-2 py-4 text-center text-text-tertiary text-xs transition-theme">-</td>;
                                         }
 
-                                        const stratColor = data.strategy >= 0 ? 'text-green-600' : 'text-red-600';
+                                        const stratColor = data.strategy >= 0 ? 'text-success' : 'text-danger';
 
                                         return (
                                             <td key={monthIdx} className="px-2 py-4 text-center">
-                                                <div className={`text-sm font-bold ${stratColor}`}>{data.strategy.toFixed(1)}%</div>
+                                                <div className={`text-sm font-bold ${stratColor} transition-theme`}>{data.strategy.toFixed(1)}%</div>
                                                 <div className="flex justify-center gap-1.5 text-[10px] mt-1 font-medium">
-                                                    <span className="text-gray-400" title="QQQ">{data.benchmark.toFixed(1)}%</span>
-                                                    <span className="text-purple-400" title="TQQQ">{data.benchmarkTQQQ.toFixed(1)}%</span>
+                                                    <span className="text-text-tertiary transition-theme" title="QQQ">{data.benchmark.toFixed(1)}%</span>
+                                                    <span className="text-accent transition-theme" title="TQQQ">{data.benchmarkTQQQ.toFixed(1)}%</span>
                                                 </div>
                                             </td>
                                         );
                                     })}
-                                    <td className="px-4 py-4 text-center bg-gray-50 sticky right-0 z-10 border-l border-gray-200 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                                        <div className={`text-sm font-bold ${ytdStrat >= 0 ? 'text-green-600' : 'text-red-600'}`}>{ytdStrat.toFixed(1)}%</div>
+                                    <td className="px-4 py-4 text-center bg-surface-elevated sticky right-0 z-10 border-l border-border shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-theme">
+                                        <div className={`text-sm font-bold ${ytdStrat >= 0 ? 'text-success' : 'text-danger'} transition-theme`}>{ytdStrat.toFixed(1)}%</div>
                                         <div className="flex justify-center gap-2 text-[10px] mt-1 font-medium">
-                                            <span className="text-gray-400" title="QQQ">{ytdBen.toFixed(1)}%</span>
-                                            <span className="text-purple-500" title="TQQQ">{ytdTQQQ.toFixed(1)}%</span>
+                                            <span className="text-text-tertiary transition-theme" title="QQQ">{ytdBen.toFixed(1)}%</span>
+                                            <span className="text-accent transition-theme" title="TQQQ">{ytdTQQQ.toFixed(1)}%</span>
                                         </div>
                                     </td>
                                 </tr>

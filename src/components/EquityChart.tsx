@@ -42,10 +42,10 @@ const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
     ];
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div className="bg-surface p-6 rounded-2xl shadow-sm border border-border-light transition-theme">
             <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2 transition-theme">
+                    <TrendingUp className="w-5 h-5 text-primary transition-theme" />
                     Equity Curve
                 </h2>
                 <div className="flex items-center gap-4 text-sm">
@@ -54,11 +54,11 @@ const EquityChart = React.memo(({ equityCurve }: EquityChartProps) => {
                             key={series.key}
                             type="button"
                             onClick={() => toggleLineVisibility(series.key)}
-                            className={`flex items-center gap-2 transition-opacity ${visibleLines[series.key] ? 'opacity-100' : 'opacity-50'}`}
+                            className={`flex items-center gap-2 transition-theme ${visibleLines[series.key] ? 'opacity-100' : 'opacity-50'}`}
                             aria-pressed={visibleLines[series.key]}
                         >
                             <div className={`w-3 h-3 rounded-full ${series.color}`} />
-                            <span className="text-gray-600 font-medium">{series.label}</span>
+                            <span className="text-text-secondary font-medium transition-theme">{series.label}</span>
                         </button>
                     ))}
                 </div>
