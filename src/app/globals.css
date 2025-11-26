@@ -5,9 +5,9 @@
   --font-family-display: var(--font-geist-sans);
   --font-family-mono: var(--font-geist-mono);
 
-  /* Light Mode Colors (default) */
-  --color-background: #ffffff;
-  --color-foreground: #0a0a0a;
+  /* Light theme colors */
+  --color-background: #f9fafb;
+  --color-foreground: #111827;
   --color-surface: #ffffff;
   --color-surface-hover: #f3f4f6;
   --color-surface-elevated: #fafafa;
@@ -77,6 +77,17 @@
   --color-gradient-page: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
   --color-gradient-button: linear-gradient(to right, #3b82f6, #6366f1);
   --color-gradient-button-hover: linear-gradient(to right, #2563eb, #4f46e5);
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  >>>>>>>1b43bd5 (feat: enhance mobile UX for theme system)
 }
 
 body {

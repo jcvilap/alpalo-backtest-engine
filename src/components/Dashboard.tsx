@@ -281,61 +281,55 @@ function DashboardContent() {
             {result && (
                 <div className="sticky top-0 z-50 bg-surface border-b border-border shadow-md animate-slide-down transition-theme">
                     <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-2 sm:py-3">
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4">
-                            {/* Title */}
+                        {/* Title Row with Theme Toggle */}
+                        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-0">
                             <div className="flex items-center gap-2 min-w-0">
                                 <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-primary transition-theme flex-shrink-0" />
                                 <h1 className="text-base sm:text-xl font-bold text-text-primary transition-theme truncate">Alpalo Backtest Engine</h1>
                             </div>
+                            <ThemeToggle />
+                        </div>
 
-                            {/* Condensed Inputs */}
-                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                                <div className="flex items-center gap-2">
-                                    <ThemeToggle />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="date"
-                                        value={startDate}
-                                        min={minDate}
-                                        onChange={(e) => {
-                                            const newStart = e.target.value;
-                                            setStartDate(newStart);
-                                            setSelectedRange(null);
-                                            // Update URL with custom date range if both dates are set
-                                            if (newStart && endDate) {
-                                                updateUrl(undefined, undefined, newStart, endDate);
-                                            }
-                                        }}
-                                        className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary min-w-[120px]"
-                                    />
-                                </div>
-                                <span className="text-text-tertiary transition-theme hidden sm:inline">→</span>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="date"
-                                        value={endDate}
-                                        onChange={(e) => {
-                                            const newEnd = e.target.value;
-                                            setEndDate(newEnd);
-                                            setSelectedRange(null);
-                                            // Update URL with custom date range if both dates are set
-                                            if (startDate && newEnd) {
-                                                updateUrl(undefined, undefined, startDate, newEnd);
-                                            }
-                                        }}
-                                        className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary min-w-[120px]"
-                                    />
-                                </div>
-                                <button
-                                    onClick={() => runBacktest()}
-                                    disabled={loading}
-                                    className={'px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-lg font-semibold transition-theme flex items-center gap-1.5 sm:gap-2 whitespace-nowrap ' + (loading ? 'bg-gray-300 cursor-not-allowed text-gray-600' : 'bg-primary hover:bg-primary-hover text-white')}
-                                >
-                                    <Play className="w-3 h-3 sm:w-4 sm:h-4" />
-                                    {loading ? 'Running...' : 'Run'}
-                                </button>
-                            </div>
+                        {/* Inputs Row - Full Width on Mobile */}
+                        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                            <input
+                                type="date"
+                                value={startDate}
+                                min={minDate}
+                                onChange={(e) => {
+                                    const newStart = e.target.value;
+                                    setStartDate(newStart);
+                                    setSelectedRange(null);
+                                    // Update URL with custom date range if both dates are set
+                                    if (newStart && endDate) {
+                                        updateUrl(undefined, undefined, newStart, endDate);
+                                    }
+                                }}
+                                className="flex-1 sm:flex-none px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary sm:min-w-[120px]"
+                            />
+                            <span className="text-text-tertiary transition-theme hidden sm:inline">→</span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => {
+                                    const newEnd = e.target.value;
+                                    setEndDate(newEnd);
+                                    setSelectedRange(null);
+                                    // Update URL with custom date range if both dates are set
+                                    if (startDate && newEnd) {
+                                        updateUrl(undefined, undefined, startDate, newEnd);
+                                    }
+                                }}
+                                className="flex-1 sm:flex-none px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary sm:min-w-[120px]"
+                            />
+                            <button
+                                onClick={() => runBacktest()}
+                                disabled={loading}
+                                className={'flex-shrink-0 px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-lg font-semibold transition-theme flex items-center gap-1.5 sm:gap-2 whitespace-nowrap ' + (loading ? 'bg-gray-300 cursor-not-allowed text-gray-600' : 'bg-primary hover:bg-primary-hover text-white')}
+                            >
+                                <Play className="w-3 h-3 sm:w-4 sm:h-4" />
+                                {loading ? 'Running...' : 'Run'}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -478,24 +472,24 @@ function DashboardContent() {
                         )}
                         <div className="space-y-8">
                             {/* Tabs */}
-                            <div className="flex gap-2 border-b border-border mt-6 transition-theme">
+                            <div className="flex gap-2 border-b border-border mt-6 transition-theme overflow-x-auto scrollbar-hide">
                                 <button
                                     onClick={() => handleTabChange('overview')}
-                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-theme ' + (activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                    className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
                                 >
                                     <BarChart2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     Overview
                                 </button>
                                 <button
                                     onClick={() => handleTabChange('trades')}
-                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-theme ' + (activeTab === 'trades' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                    className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'trades' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
                                 >
                                     <List className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     Trades
                                 </button>
                                 <button
                                     onClick={() => handleTabChange('monthly')}
-                                    className={'px-4 py-2 font-medium flex items-center gap-2 border-b-2 transition-theme ' + (activeTab === 'monthly' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                    className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'monthly' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
                                 >
                                     <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     Monthly
@@ -503,6 +497,7 @@ function DashboardContent() {
                                 {selectedRange && cliLines.length > 0 && (
                                     <button
                                         onClick={() => handleTabChange('cli')}
+                                        className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'cli' ? 'border-success text-success' : 'border-transparent text-text-secondary hover:text-text-primary')}
                                     >
                                         <Terminal className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                         <span className="hidden sm:inline">CLI Output</span>
