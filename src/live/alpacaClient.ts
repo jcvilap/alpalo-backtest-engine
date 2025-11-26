@@ -1,15 +1,16 @@
 /**
  * Alpaca REST Client
  *
- * A lightweight HTTP client for interacting with Alpaca's trading API.
- * Handles authentication, request formatting, and response parsing.
+ * A lightweight wrapper around the official Alpaca Trade API SDK.
+ * Provides a simplified interface for common trading operations.
  *
- * This is a pure client layer with no business logic - it simply wraps
- * the HTTP calls to Alpaca's REST API.
+ * This client wraps @alpacahq/alpaca-trade-api with our application's
+ * configuration and type definitions.
  *
  * API Documentation: https://alpaca.markets/docs/api-references/trading-api/
  */
 
+import Alpaca from '@alpacahq/alpaca-trade-api';
 import { getAlpacaConfig } from '../config/secrets';
 
 /**
@@ -185,12 +186,11 @@ export class AlpacaError extends Error {
 /**
  * Alpaca REST Client
  *
- * Handles authentication and HTTP requests to Alpaca's trading API.
+ * Wraps the official Alpaca Trade API SDK with our configuration.
  */
 export class AlpacaClient {
-    private baseUrl: string;
-    private keyId: string;
-    private secretKey: string;
+    private api: Alpaca;
+    private isPaper: boolean;
 
     /**
      * Create a new Alpaca client
@@ -199,63 +199,24 @@ export class AlpacaClient {
      */
     constructor(isPaper: boolean = true) {
         const config = getAlpacaConfig(isPaper);
-        this.baseUrl = config.baseUrl;
-        this.keyId = config.keyId;
-        this.secretKey = config.secretKey;
+        this.isPaper = isPaper;
+
+        // Initialize the official Alpaca SDK
+        this.api = new Alpaca({
+            keyId: config.keyId,
+            secretKey: config.secretKey,
+            paper: isPaper,
+            timeout: 60000, // 60 second timeout
+        });
     }
 
     /**
-     * Make an authenticated request to Alpaca API
+     * Get the underlying Alpaca API instance
      *
-     * @param path - API endpoint path (e.g., '/v2/account')
-     * @param options - Fetch options (method, body, etc.)
-     * @returns Parsed JSON response
+     * For advanced use cases that need direct SDK access
      */
-    private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-        const url = `${this.baseUrl}${path}`;
-
-        const headers: HeadersInit = {
-            'APCA-API-KEY-ID': this.keyId,
-            'APCA-API-SECRET-KEY': this.secretKey,
-            'Content-Type': 'application/json',
-            ...options.headers
-        };
-
-        try {
-            const response = await fetch(url, {
-                ...options,
-                headers
-            });
-
-            // Parse response body
-            const text = await response.text();
-            let data: unknown;
-
-            try {
-                data = text ? JSON.parse(text) : null;
-            } catch {
-                data = text;
-            }
-
-            // Check for errors
-            if (!response.ok) {
-                const errorMessage = typeof data === 'object' && data && 'message' in data
-                    ? String((data as { message: string }).message)
-                    : `HTTP ${response.status}: ${response.statusText}`;
-
-                throw new AlpacaError(errorMessage, response.status, data);
-            }
-
-            return data as T;
-        } catch (error) {
-            if (error instanceof AlpacaError) {
-                throw error;
-            }
-
-            throw new AlpacaError(
-                `Request failed: ${error instanceof Error ? error.message : String(error)}`
-            );
-        }
+    getApi(): Alpaca {
+        return this.api;
     }
 
     /**
@@ -264,7 +225,15 @@ export class AlpacaClient {
      * @returns Account details including cash, portfolio value, buying power
      */
     async getAccount(): Promise<AlpacaAccount> {
-        return this.request<AlpacaAccount>('/v2/account');
+        try {
+            return await this.api.getAccount() as unknown as AlpacaAccount;
+        } catch (error: any) {
+            throw new AlpacaError(
+                error.message || 'Failed to get account',
+                error.response?.status,
+                error.response?.data
+            );
+        }
     }
 
     /**
@@ -273,7 +242,15 @@ export class AlpacaClient {
      * @returns Array of current positions
      */
     async getPositions(): Promise<AlpacaPosition[]> {
-        return this.request<AlpacaPosition[]>('/v2/positions');
+        try {
+            return await this.api.getPositions() as unknown as AlpacaPosition[];
+        } catch (error: any) {
+            throw new AlpacaError(
+                error.message || 'Failed to get positions',
+                error.response?.status,
+                error.response?.data
+            );
+        }
     }
 
     /**
@@ -284,12 +261,17 @@ export class AlpacaClient {
      */
     async getPosition(symbol: string): Promise<AlpacaPosition | null> {
         try {
-            return await this.request<AlpacaPosition>(`/v2/positions/${symbol}`);
-        } catch (error) {
-            if (error instanceof AlpacaError && error.statusCode === 404) {
+            return await this.api.getPosition(symbol) as unknown as AlpacaPosition;
+        } catch (error: any) {
+            // Return null if position doesn't exist (404)
+            if (error.response?.status === 404) {
                 return null;
             }
-            throw error;
+            throw new AlpacaError(
+                error.message || `Failed to get position for ${symbol}`,
+                error.response?.status,
+                error.response?.data
+            );
         }
     }
 
@@ -300,10 +282,15 @@ export class AlpacaClient {
      * @returns Order confirmation
      */
     async submitOrder(order: AlpacaOrderRequest): Promise<AlpacaOrder> {
-        return this.request<AlpacaOrder>('/v2/orders', {
-            method: 'POST',
-            body: JSON.stringify(order)
-        });
+        try {
+            return await this.api.createOrder(order as any) as unknown as AlpacaOrder;
+        } catch (error: any) {
+            throw new AlpacaError(
+                error.message || 'Failed to submit order',
+                error.response?.status,
+                error.response?.data
+            );
+        }
     }
 
     /**
@@ -314,7 +301,15 @@ export class AlpacaClient {
      * @returns Market clock information
      */
     async getClock(): Promise<AlpacaClock> {
-        return this.request<AlpacaClock>('/v2/clock');
+        try {
+            return await this.api.getClock() as unknown as AlpacaClock;
+        } catch (error: any) {
+            throw new AlpacaError(
+                error.message || 'Failed to get market clock',
+                error.response?.status,
+                error.response?.data
+            );
+        }
     }
 
     /**
@@ -324,9 +319,15 @@ export class AlpacaClient {
      * @returns Success status
      */
     async cancelOrder(orderId: string): Promise<void> {
-        await this.request<void>(`/v2/orders/${orderId}`, {
-            method: 'DELETE'
-        });
+        try {
+            await this.api.cancelOrder(orderId);
+        } catch (error: any) {
+            throw new AlpacaError(
+                error.message || `Failed to cancel order ${orderId}`,
+                error.response?.status,
+                error.response?.data
+            );
+        }
     }
 
     /**
@@ -337,6 +338,25 @@ export class AlpacaClient {
      * @returns Array of orders
      */
     async getOrders(status: 'open' | 'closed' | 'all' = 'open', limit: number = 50): Promise<AlpacaOrder[]> {
-        return this.request<AlpacaOrder[]>(`/v2/orders?status=${status}&limit=${limit}`);
+        try {
+            return await this.api.getOrders({ status, limit } as any) as unknown as AlpacaOrder[];
+        } catch (error: any) {
+            throw new AlpacaError(
+                error.message || 'Failed to get orders',
+                error.response?.status,
+                error.response?.data
+            );
+        }
+    }
+
+    /**
+     * Check if current time is after 3 PM ET
+     *
+     * Useful for end-of-day trading logic
+     */
+    isAfter3PM(): boolean {
+        const now = new Date();
+        const estNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+        return estNow.getHours() >= 15;
     }
 }
