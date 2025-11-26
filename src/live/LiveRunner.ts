@@ -10,7 +10,7 @@
  */
 
 import { DataFeed } from '../ports/DataFeed';
-import { Broker } from '../ports/Broker';
+import { Broker, OrderResult } from '../ports/Broker';
 import { runStrategy } from '../strategy/engine';
 import { StrategyParams } from '../strategy/types';
 import { PortfolioManager } from '../lib/trade/PortfolioManager';
@@ -125,7 +125,7 @@ export class LiveRunner {
         console.log('[LIVE RUNNER] Orders to execute:', orders);
 
         // 5. Execute orders (if any)
-        let orderResults: any[] = [];
+        let orderResults: OrderResult[] = [];
         if (orders.length > 0) {
             // NOTE: In a real implementation, you would:
             // - Validate market hours

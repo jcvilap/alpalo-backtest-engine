@@ -4,12 +4,12 @@
  * produces identical results to the old implementation.
  */
 
-import { BacktestEngine as OldEngine } from './src/lib/backtest/backtestEngine';
-import { BacktestDataFeed } from './src/backtest/BacktestDataFeed';
-import { BacktestBroker } from './src/backtest/BacktestBroker';
-import { BacktestRunner } from './src/backtest/BacktestRunner';
-import { createDefaultStrategyParams } from './src/strategy/engine';
-import { OHLC } from './src/lib/types';
+import { BacktestEngine as OldEngine } from '../src/lib/backtest/backtestEngine';
+import { BacktestDataFeed } from '../src/backtest/BacktestDataFeed';
+import { BacktestBroker } from '../src/backtest/BacktestBroker';
+import { BacktestRunner } from '../src/backtest/BacktestRunner';
+import { createDefaultStrategyParams } from '../src/strategy/engine';
+import { OHLC } from '../src/lib/types';
 
 // Generate mock data for testing
 function generateMockData(days: number, startPrice: number = 100): OHLC[] {

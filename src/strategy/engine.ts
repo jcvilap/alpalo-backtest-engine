@@ -15,6 +15,14 @@
 
 import { StrategyController } from '../lib/strategy/strategyController';
 import { MarketSnapshot, PortfolioState, StrategyParams, StrategyDecision } from './types';
+import {
+    MA_PERIODS,
+    ROC_PERIODS,
+    MEAN_REVERSION,
+    SQQQ_CRITERIA,
+    TREND_WEIGHTS,
+    CONTROLLER
+} from '../lib/strategy/config';
 
 /**
  * Run the trading strategy and generate a decision
@@ -83,16 +91,6 @@ export function runStrategy(
  * @returns Default strategy parameters
  */
 export function createDefaultStrategyParams(): StrategyParams {
-    // Import config values
-    const {
-        MA_PERIODS,
-        ROC_PERIODS,
-        MEAN_REVERSION,
-        SQQQ_CRITERIA,
-        TREND_WEIGHTS,
-        CONTROLLER
-    } = require('../lib/strategy/config');
-
     return {
         maPeriods: {
             short: MA_PERIODS.SHORT,

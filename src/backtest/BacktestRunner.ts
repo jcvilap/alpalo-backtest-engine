@@ -21,6 +21,7 @@ import { StrategyParams } from '../strategy/types';
 import { PortfolioManager } from '../lib/trade/PortfolioManager';
 import { BacktestResult, Trade } from '../lib/backtest/backtestEngine';
 import { toNYDate, getNYNow } from '../lib/utils/dateUtils';
+import { BacktestBroker } from './BacktestBroker';
 
 /**
  * Backtest configuration
@@ -123,8 +124,8 @@ export class BacktestRunner {
             if (!snapshot) continue;
 
             // Update broker with current prices
-            if ('updatePrices' in this.broker && typeof this.broker.updatePrices === 'function') {
-                (this.broker as any).updatePrices(snapshot.prices);
+            if (this.broker instanceof BacktestBroker) {
+                this.broker.updatePrices(snapshot.prices);
             }
 
             // Get portfolio state

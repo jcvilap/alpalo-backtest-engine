@@ -59,7 +59,6 @@ async function runBacktest(
         filteredSQQQ = sqqqData.filter(d => toNYDate(d.date) <= toDate);
     }
 
-    // NEW ARCHITECTURE: Use BacktestRunner with adapters
     const dataFeed = new BacktestDataFeed(filteredQQQ, filteredTQQQ, filteredSQQQ);
     const broker = new BacktestBroker(capital);
     const params = createDefaultStrategyParams();

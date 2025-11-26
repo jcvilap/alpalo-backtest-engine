@@ -33,7 +33,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No data available for TQQQ' }, { status: 404 });
         }
 
-        // Run backtest using new architecture
         const capital = 1_000_000;
         console.log('[BACKTEST API] Running backtest with capital:', capital);
 
