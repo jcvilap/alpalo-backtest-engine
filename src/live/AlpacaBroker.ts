@@ -50,7 +50,8 @@ export class AlpacaBroker implements Broker {
 
         return {
             cash: parseFloat(account.cash),
-            position: position
+            position: position,
+            totalEquity: parseFloat(account.equity)
         };
     }
 
