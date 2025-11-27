@@ -2,64 +2,80 @@
  * Multi-Account Configuration
  *
  * This module handles the configuration for multiple Alpaca accounts.
- * It supports reading from a JSON-based environment variable (TRADING_ACCOUNTS_CONFIG)
+ * It supports reading from a JSON-based environment variable (ACCOUNTS)
  * or falling back to legacy single-account environment variables.
  */
 
 import { TradingMode, getTradingMode } from './env';
 
 /**
- * Configuration for a single trading account
+ * Configuration for a single trading account from ACCOUNTS env var
  */
 export interface AccountConfig {
-    /** Unique identifier for the account (e.g., "PAPER_1", "LIVE_MAIN") */
-    id: string;
+    /** Display name for the account (e.g., "Account #1", "Live Trading") */
+    name: string;
 
-    /** Trading mode for this account */
-    mode: TradingMode;
+    /** Alpaca API key */
+    key: string;
 
-    /** Alpaca API credentials */
-    alpaca: {
-        keyId: string;
-        secretKey: string;
-    };
+    /** Alpaca API secret */
+    secret: string;
 
-    /** Safety and behavior settings */
-    settings: {
-        /** Maximum equity to allocate to this strategy (in dollars) */
-        maxEquity: number;
+    /** Whether this is a paper trading account */
+    isPaper: boolean;
+}
 
-        /** Whether short selling is allowed */
-        allowShorting: boolean;
+/**
+ * Parse a JSON string that may be single-quoted or double-quoted
+ *
+ * .env files sometimes use single quotes, which are not valid JSON.
+ * This helper converts single-quoted strings to double-quoted before parsing.
+ */
+function parseEnvJson(jsonString: string): unknown {
+    // Remove leading/trailing whitespace
+    let cleaned = jsonString.trim();
 
-        /** Whether to run in dry-run mode (no actual orders placed) */
-        isDryRun: boolean;
-    };
+    // If the string starts with a single quote, replace all single quotes with double quotes
+    // This is a simple heuristic that works for most .env use cases
+    if (cleaned.startsWith("'")) {
+        // Remove outer single quotes if present
+        if (cleaned.startsWith("'") && cleaned.endsWith("'")) {
+            cleaned = cleaned.slice(1, -1);
+        }
+        // Replace escaped single quotes temporarily
+        cleaned = cleaned.replace(/\\'/g, '__ESCAPED_QUOTE__');
+        // Replace single quotes with double quotes
+        cleaned = cleaned.replace(/'/g, '"');
+        // Restore escaped quotes
+        cleaned = cleaned.replace(/__ESCAPED_QUOTE__/g, "'");
+    }
+
+    return JSON.parse(cleaned);
 }
 
 /**
  * Get all configured trading accounts
  *
  * Priority:
- * 1. TRADING_ACCOUNTS_CONFIG environment variable (JSON array)
+ * 1. ACCOUNTS environment variable (JSON array with simplified format)
  * 2. Legacy environment variables (PAPER_ALPACA_KEY_ID, etc.)
  *
  * @returns Array of validated account configurations
  * @throws Error if no valid configuration is found
  */
 export function getConfiguredAccounts(): AccountConfig[] {
-    // 1. Try to parse JSON config from env var
-    const jsonConfig = process.env.TRADING_ACCOUNTS_CONFIG;
-    if (jsonConfig) {
+    // 1. Try to parse JSON config from ACCOUNTS env var
+    const accountsConfig = process.env.ACCOUNTS;
+    if (accountsConfig) {
         try {
-            const accounts = JSON.parse(jsonConfig) as AccountConfig[];
+            const accounts = parseEnvJson(accountsConfig) as AccountConfig[];
             if (Array.isArray(accounts) && accounts.length > 0) {
                 validateAccounts(accounts);
                 return accounts;
             }
         } catch (error) {
             // @ts-expect-error -- need to deploy quickly resolve type on next commit please
-            console.warn(`Failed to parse TRADING_ACCOUNTS_CONFIG: ${error.message}`);
+            console.warn(`Failed to parse ACCOUNTS: ${error.message}`);
         }
     }
 
@@ -84,18 +100,10 @@ function getLegacyAccountConfig(): AccountConfig {
     }
 
     return {
-        id: `DEFAULT_${mode}`,
-        mode: mode,
-        alpaca: {
-            keyId,
-            secretKey
-        },
-        settings: {
-            // Default settings for legacy mode
-            maxEquity: 100_000, // Default cap
-            allowShorting: true, // Default to allowing shorting
-            isDryRun: false
-        }
+        name: `Legacy ${mode} Account`,
+        key: keyId,
+        secret: secretKey,
+        isPaper: isPaper
     };
 }
 
@@ -103,27 +111,26 @@ function getLegacyAccountConfig(): AccountConfig {
  * Validate a list of account configurations
  */
 function validateAccounts(accounts: AccountConfig[]): void {
-    const ids = new Set<string>();
+    const names = new Set<string>();
 
     for (const account of accounts) {
-        // Check for duplicate IDs
-        if (ids.has(account.id)) {
-            throw new Error(`Duplicate account ID found: ${account.id}`);
+        // Check for duplicate names
+        if (names.has(account.name)) {
+            throw new Error(`Duplicate account name found: ${account.name}`);
         }
-        ids.add(account.id);
+        names.add(account.name);
 
         // Validate required fields
-        if (!account.id) throw new Error('Account ID is required');
-        if (!account.mode) throw new Error(`Account ${account.id}: Mode is required`);
-        if (!account.alpaca?.keyId) throw new Error(`Account ${account.id}: Alpaca Key ID is required`);
-        if (!account.alpaca?.secretKey) throw new Error(`Account ${account.id}: Alpaca Secret Key is required`);
+        if (!account.name) throw new Error('Account name is required');
+        if (!account.key) throw new Error(`Account ${account.name}: API key is required`);
+        if (!account.secret) throw new Error(`Account ${account.name}: API secret is required`);
+        if (account.isPaper === undefined || account.isPaper === null) {
+            throw new Error(`Account ${account.name}: isPaper flag is required`);
+        }
 
-        // Safety check for LIVE accounts
-        if (account.mode === TradingMode.LIVE) {
-            if (account.settings.isDryRun === undefined) {
-                console.warn(`Account ${account.id} (LIVE): isDryRun not specified, defaulting to TRUE for safety`);
-                account.settings.isDryRun = true;
-            }
+        // Safety warning for LIVE accounts
+        if (!account.isPaper) {
+            console.warn(`⚠️  Account "${account.name}" is configured for LIVE TRADING. Ensure you have appropriate safety measures in place.`);
         }
     }
 }
