@@ -13,6 +13,7 @@ import CliOutput from './CliOutput';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import ThemeToggle from './ThemeToggle';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 function DashboardContent() {
     const searchParams = useSearchParams();
@@ -276,7 +277,9 @@ function DashboardContent() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-page transition-theme">
+        <div className="min-h-screen bg-background text-text-primary font-display transition-theme">
+            <LoadingOverlay isLoading={loading} />
+
             {/* Sticky Header - shown when results are loaded */}
             {result && (
                 <div className="sticky top-0 z-50 bg-surface border-b border-border shadow-md animate-slide-down transition-theme">
@@ -440,7 +443,7 @@ function DashboardContent() {
                                     }}
                                     aria-disabled={isDisabled}
                                     tabIndex={isDisabled ? -1 : 0}
-                                    className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-theme inline-flex items-center justify-center ' + (isDisabled ? 'cursor-not-allowed ' : '') + (isSelected ? 'bg-primary text-white border-primary opacity-90' : loading ? 'opacity-50 text-text-secondary bg-surface border-border' : 'text-text-primary bg-surface border-border hover:bg-surface-elevated hover:border-border')}
+                                    className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-theme inline-flex items-center justify-center ' + (isDisabled ? 'cursor-not-allowed ' : '') + (isSelected ? 'bg-primary text-white border-primary opacity-90' : loading ? 'opacity-50 text-text-secondary bg-surface border-border' : 'text-text-primary bg-surface border-border hover:bg-surface-hover hover:border-border-hover')}
                                 >
                                     {range}
                                 </Link>
@@ -450,26 +453,12 @@ function DashboardContent() {
                 </div>
 
                 {/* Loader - shown when loading and no results yet */}
-                {loading && !result && (
-                    <div className="flex items-center justify-center min-h-[400px]">
-                        <div className="flex flex-col items-center gap-4">
-                            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                            <p className="text-primary font-semibold text-lg animate-pulse transition-theme">Running Backtest...</p>
-                        </div>
-                    </div>
-                )}
+
 
                 {/* Results */}
                 {result && (
                     <div className="relative min-h-[400px]">
-                        {loading && (
-                            <div className="absolute inset-0 bg-surface/80 backdrop-blur-sm z-40 flex items-center justify-center rounded-2xl transition-theme">
-                                <div className="flex flex-col items-center gap-3">
-                                    <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                                    <p className="text-primary font-medium animate-pulse transition-theme">Running Backtest...</p>
-                                </div>
-                            </div>
-                        )}
+
                         <div className="space-y-8">
                             {/* Tabs */}
                             <div className="flex gap-2 border-b border-border mt-6 transition-theme overflow-x-auto scrollbar-hide">

@@ -10,7 +10,7 @@
   --color-foreground: #111827;
   --color-surface: #ffffff;
   --color-surface-hover: #f3f4f6;
-  --color-surface-elevated: #fafafa;
+  <<<<<<< HEAD --color-surface-elevated: #fafafa;
 
   --color-primary: #2563eb;
   --color-primary-hover: #1d4ed8;
@@ -87,7 +87,83 @@
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
-  >>>>>>>1b43bd5 (feat: enhance mobile UX for theme system)
+}
+
+/* Custom Animations */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-reverse-slower {
+  from {
+    transform: rotate(360deg);
+  }
+
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.2);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: 0 0 25px rgba(37, 99, 235, 0.5);
+    transform: scale(1.05);
+  }
+}
+
+@keyframes bounce-subtle {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10%);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-50%);
+  }
+
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+.animate-spin-reverse-slower {
+  animation: spin-reverse-slower 4s linear infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s linear infinite;
 }
 
 body {
