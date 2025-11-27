@@ -3,24 +3,23 @@ import { Activity } from 'lucide-react';
 
 interface LoadingOverlayProps {
     isLoading: boolean;
-    message?: string;
 }
 
-export default function LoadingOverlay({ isLoading, message = 'Analyzing Market Data...' }: LoadingOverlayProps) {
+const messages = [
+    'Analyzing Market Data...',
+    'Calculating Indicators...',
+    'Simulating Trades...',
+    'Optimizing Performance...',
+    'Finalizing Results...'
+];
+
+export default function LoadingOverlay({ isLoading }: LoadingOverlayProps) {
     const [show, setShow] = useState(false);
     const [textIndex, setTextIndex] = useState(0);
 
-    // Rotating messages to keep user engaged
-    const messages = [
-        'Analyzing Market Data...',
-        'Calculating Indicators...',
-        'Simulating Trades...',
-        'Optimizing Performance...',
-        'Finalizing Results...'
-    ];
-
     useEffect(() => {
         if (isLoading) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setShow(true);
             // Cycle through messages
             const interval = setInterval(() => {
