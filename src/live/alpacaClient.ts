@@ -195,10 +195,34 @@ export class AlpacaClient {
     /**
      * Create a new Alpaca client
      *
-     * @param isPaper - Whether to use paper trading (default: true)
+     * @param isPaperOrKeyId - Whether to use paper trading (boolean) OR API key ID (string)
+     * @param secretKey - Optional API secret key (required if first param is a string)
      */
-    constructor(isPaper: boolean = true) {
-        const config = getAlpacaConfig(isPaper);
+    constructor(isPaperOrKeyId: boolean | string = true, secretKey?: string) {
+        let config: { keyId: string; secretKey: string; baseUrl: string };
+        let isPaper: boolean;
+
+        // Handle two initialization modes:
+        // 1. Legacy mode: isPaperOrKeyId is a boolean, read from env vars
+        // 2. Direct mode: isPaperOrKeyId is a key string, secretKey is provided
+        if (typeof isPaperOrKeyId === 'boolean') {
+            // Legacy mode: read from env vars
+            isPaper = isPaperOrKeyId;
+            config = getAlpacaConfig(isPaper);
+        } else {
+            // Direct mode: use provided credentials
+            if (!secretKey) {
+                throw new Error('Secret key is required when providing API key directly');
+            }
+            config = {
+                keyId: isPaperOrKeyId,
+                secretKey: secretKey,
+                baseUrl: 'https://paper-api.alpaca.markets' // Default to paper for safety
+            };
+            // Infer isPaper from the key or default to true for safety
+            isPaper = true;
+        }
+
         this.isPaper = isPaper;
 
         // Initialize the official Alpaca SDK

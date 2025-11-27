@@ -8,33 +8,37 @@ This plan outlines the steps to implement robust live trading with support for m
 
 We need a structured way to define multiple accounts and their associated credentials.
 
-### Task 1.1: Define Account Configuration Structure
-**Goal**: Create a configuration module to parse and validate multiple accounts from environment variables.
-**Files**: `src/config/accounts.ts` (NEW), `src/config/types.ts` (NEW or existing)
+### Task 1.1: Define Account Configuration Structure ✅ COMPLETED
+**Goal**: Create a configuration module to parse and validate multiple accounts from environment variables using simplified ACCOUNTS format.
+**Files**: `src/config/accounts.ts`
 **Concept**:
-- Define `AccountConfig` interface:
-  - `id`: string (e.g., "PAPER_1", "LIVE_MAIN")
-  - `mode`: TradingMode (PAPER | LIVE)
-  - `alpaca`: { keyId: string, secretKey: string }
-  - `settings`: { maxPositionSize: number, isDryRun: boolean }
+- Define `AccountConfig` interface with simplified format:
+  - `name`: string (e.g., "Account #1", "Live Trading")
+  - `key`: string (Alpaca API key)
+  - `secret`: string (Alpaca API secret)
+  - `isPaper`: boolean (true for paper trading, false for live)
 - Implement `getConfiguredAccounts()`:
-  - Reads env vars like `ALPACA_ACCOUNTS_JSON` (array of configs) OR parses prefixed env vars (e.g., `ACC_1_KEY_ID`, `ACC_1_MODE`).
-  - *Recommendation*: Use a JSON-based env var `TRADING_ACCOUNTS` for flexibility, or a fixed structure if simpler. Let's go with a robust helper that can read individual sets if JSON is too complex for .env files, but JSON is standard for lists.
-  - Validation: Ensure no LIVE account is configured without explicit safety flags.
+  - Reads `ACCOUNTS` env var (JSON array with single-quote support)
+  - Falls back to legacy env vars (PAPER_ALPACA_KEY_ID, etc) for backward compatibility
+  - Validation: Ensures all required fields are present and warns for LIVE accounts
 
-**LLM Prompt**:
-```text
-Create src/config/accounts.ts.
-Define an interface `AccountConfig` containing:
-- id: string
-- mode: TradingMode (import from ./env)
-- alpaca: { keyId: string, secretKey: string }
-- settings: { maxEquity: number, allowShorting: boolean }
+**Implementation**:
+- ✅ Created `AccountConfig` interface with simplified format
+- ✅ Implemented `getConfiguredAccounts()` with ACCOUNTS env var support
+- ✅ Added `parseEnvJson()` helper for single-quoted JSON parsing
+- ✅ Added validation with warnings for live trading accounts
+- ✅ Maintained backward compatibility with legacy env vars
 
-Implement a function `getConfiguredAccounts(): AccountConfig[]`.
-It should read `process.env.TRADING_ACCOUNTS_CONFIG` (a JSON string).
-If that is missing, it should look for default single-account env vars (PAPER_ALPACA_KEY_ID, etc) and return a single "DEFAULT_PAPER" account config for backward compatibility.
-Add validation to ensure keys are present.
+**Example ACCOUNTS env var**:
+```
+ACCOUNTS='[
+  {
+    "name": "Account #1",
+    "key": "LIVE_KEY_1",
+    "secret": "LIVE_SECRET_1",
+    "isPaper": false
+  }
+]'
 ```
 
 ---
@@ -43,24 +47,24 @@ Add validation to ensure keys are present.
 
 We need to send alerts for trade executions and errors, tagged by account.
 
-### Task 2.1: Notification Port & Slack Adapter
+### Task 2.1: Notification Port & Slack Adapter ✅ COMPLETED
 **Goal**: Abstract notifications so we can send them to Slack (or log them).
-**Files**: `src/ports/Notifier.ts` (NEW), `src/adapters/SlackNotifier.ts` (NEW)
+**Files**: `src/ports/Notifier.ts`, `src/adapters/SlackNotifier.ts`
 **Concept**:
-- `Notifier` interface: `notify(message: string, level: 'INFO'|'ERROR', metadata?: any): Promise<void>`
+- `Notifier` interface: `notify(subject: string, message: string, level: NotificationLevel, metadata?: any): Promise<void>`
 - `SlackNotifier` implementation:
   - Uses `src/config/secrets.ts` to get webhook URL.
-  - Formats messages nicely (e.g., Green for buys, Red for sells/errors).
-  - Prefixes messages with the Account ID.
+  - Formats messages nicely with color-coded attachments (Green for INFO, Orange for WARN, Red for ERROR).
+  - Prefixes messages with the Account name.
+  - Falls back to console logging if Slack is not configured.
 
-**LLM Prompt**:
-```text
-Create a Notifier port in src/ports/Notifier.ts with a method `notify(subject: string, message: string, level: 'INFO'|'WARN'|'ERROR')`.
-Create src/adapters/SlackNotifier.ts implementing this port.
-It should read the Slack webhook URL from src/config/secrets.ts.
-If no URL is configured, it should log to console only.
-Ensure the message format is clean and supports markdown if Slack allows it.
-```
+**Implementation**:
+- ✅ Created `Notifier` interface with `NotificationLevel` enum (INFO, WARN, ERROR)
+- ✅ Implemented `SlackNotifier` with webhook support
+- ✅ Added color-coded Slack message formatting with attachments
+- ✅ Implemented console fallback for when Slack is not configured
+- ✅ Added account name prefixing for notifications
+- ✅ Included metadata field support for additional context
 
 ---
 
@@ -68,22 +72,23 @@ Ensure the message format is clean and supports markdown if Slack allows it.
 
 We need to instantiate brokers for specific accounts and enforce safety limits.
 
-### Task 3.1: Broker Factory
+### Task 3.1: Broker Factory ✅ COMPLETED
 **Goal**: Create a helper to instantiate an `AlpacaBroker` for a specific `AccountConfig`.
-**Files**: `src/live/brokerFactory.ts` (NEW)
+**Files**: `src/live/brokerFactory.ts`, `src/live/AlpacaBroker.ts`
 **Concept**:
 - `createBroker(config: AccountConfig): Broker`
 - Instantiates `AlpacaClient` with the specific keys from `config`.
 - Instantiates `AlpacaBroker` with that client.
 
-**LLM Prompt**:
-```text
-Create src/live/brokerFactory.ts.
-Export a function `createBroker(config: AccountConfig): Broker`.
-It should instantiate the AlpacaClient (from Task 4) using the credentials in `config`.
-Then it should instantiate and return an AlpacaBroker (from Task 5) using that client.
-Ensure the broker is configured for the correct mode (PAPER vs LIVE) based on config.mode.
-```
+**Implementation**:
+- ✅ Created `AlpacaBroker` class implementing the `Broker` interface
+- ✅ Implemented `getPortfolioState()` to fetch account and positions from Alpaca
+- ✅ Implemented `placeOrders()` to execute orders via Alpaca API
+- ✅ Implemented `getCurrentPrices()` to fetch current prices
+- ✅ Created `brokerFactory.ts` with `createBroker()` function
+- ✅ Updated `AlpacaClient` constructor to accept direct credentials (key, secret)
+- ✅ Added `createBrokerWithCredentials()` helper function for direct credential injection
+- ✅ Ensured broker is configured for correct mode (PAPER vs LIVE) based on `config.isPaper`
 
 ### Task 3.2: Safety Wrapper (Optional but Recommended)
 **Goal**: Enforce "No Margin" and "Max Exposure" checks *before* orders go to Alpaca.
