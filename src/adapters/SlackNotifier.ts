@@ -6,7 +6,6 @@
  */
 
 import { Notifier, NotificationLevel } from '../ports/Notifier';
-import { isSlackConfigured, getSlackConfig } from '../config/secrets';
 
 /**
  * Slack message attachment color based on notification level
@@ -58,7 +57,7 @@ export class SlackNotifier implements Notifier {
      */
     constructor(accountName?: string) {
         this.accountName = accountName;
-        this.webhookUrl = isSlackConfigured() ? getSlackConfig().webhookUrl : null;
+        this.webhookUrl = process.env.SLACK_WEBHOOK_URL || null;
 
         if (!this.webhookUrl) {
             console.log('Slack webhook not configured. Notifications will be logged to console only.');
