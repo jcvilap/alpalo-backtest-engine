@@ -57,13 +57,8 @@ POLYGON_API_KEY=your_polygon_api_key_here
 # Trading Mode (BACKTEST | PAPER | LIVE)
 TRADING_MODE=BACKTEST
 
-# Paper Trading Credentials (optional, for PAPER mode)
-PAPER_ALPACA_KEY_ID=your_paper_key_id
-PAPER_ALPACA_SECRET_KEY=your_paper_secret_key
-
-# Live Trading Credentials (optional, for LIVE mode)
-LIVE_ALPACA_KEY_ID=your_live_key_id
-LIVE_ALPACA_SECRET_KEY=your_live_secret_key
+# Multi-Account Configuration (required for PAPER/LIVE modes)
+ACCOUNTS='[{"name":"My Paper Account","key":"YOUR_PAPER_KEY","secret":"YOUR_PAPER_SECRET","isPaper":true,"broker":"Alpaca"}]'
 
 # Slack Notifications (optional)
 SLACK_WEBHOOK_URL=your_slack_webhook_url
@@ -109,8 +104,7 @@ TRADING_MODE=BACKTEST npm run dev
 ```bash
 # Set environment variables
 TRADING_MODE=PAPER
-PAPER_ALPACA_KEY_ID=your_paper_key
-PAPER_ALPACA_SECRET_KEY=your_paper_secret
+ACCOUNTS='[{"name":"My Paper Account","key":"YOUR_PAPER_KEY","secret":"YOUR_PAPER_SECRET","isPaper":true,"broker":"Alpaca"}]'
 
 npm run dev
 ```
@@ -119,13 +113,12 @@ npm run dev
 - Real trading with actual capital
 - Orders executed on live markets via Alpaca API
 - ⚠️ **USE WITH CAUTION** - Real money at risk
-- Requires live trading credentials
+- Requires live trading credentials configured in ACCOUNTS
 
 ```bash
 # Set environment variables
 TRADING_MODE=LIVE
-LIVE_ALPACA_KEY_ID=your_live_key
-LIVE_ALPACA_SECRET_KEY=your_live_secret
+ACCOUNTS='[{"name":"My Live Account","key":"YOUR_LIVE_KEY","secret":"YOUR_LIVE_SECRET","isPaper":false,"broker":"Alpaca"}]'
 
 npm run dev
 ```

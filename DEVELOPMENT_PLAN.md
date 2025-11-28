@@ -19,7 +19,6 @@ We need a structured way to define multiple accounts and their associated creden
   - `isPaper`: boolean (true for paper trading, false for live)
 - Implement `getConfiguredAccounts()`:
   - Reads `ACCOUNTS` env var (JSON array with single-quote support)
-  - Falls back to legacy env vars (PAPER_ALPACA_KEY_ID, etc) for backward compatibility
   - Validation: Ensures all required fields are present and warns for LIVE accounts
 
 **Implementation**:

@@ -3,11 +3,8 @@
  *
  * This module handles the configuration for multiple broker accounts.
  * Supports Alpaca (paper and live) and Robinhood (live only).
- * It reads from a JSON-based environment variable (ACCOUNTS)
- * or falls back to legacy single-account environment variables.
+ * Accounts are configured via the ACCOUNTS environment variable (JSON array).
  */
-
-import { TradingMode, getTradingMode } from './env';
 
 /**
  * Supported broker types
@@ -68,56 +65,43 @@ function parseEnvJson(jsonString: string): unknown {
 /**
  * Get all configured trading accounts
  *
- * Priority:
- * 1. ACCOUNTS environment variable (JSON array with simplified format)
- * 2. Legacy environment variables (PAPER_ALPACA_KEY_ID, etc.)
+ * Reads account configurations from the ACCOUNTS environment variable.
+ * The ACCOUNTS variable should be a JSON array of account objects.
  *
  * @returns Array of validated account configurations
- * @throws Error if no valid configuration is found
+ * @throws Error if ACCOUNTS is not set or invalid
  */
 export function getConfiguredAccounts(): AccountConfig[] {
-    // 1. Try to parse JSON config from ACCOUNTS env var
     const accountsConfig = process.env.ACCOUNTS;
-    if (accountsConfig) {
-        try {
-            const accounts = parseEnvJson(accountsConfig) as AccountConfig[];
-            if (Array.isArray(accounts) && accounts.length > 0) {
-                validateAccounts(accounts);
-                return accounts;
-            }
-        } catch (error) {
-            // @ts-expect-error -- need to deploy quickly resolve type on next commit please
-            console.warn(`Failed to parse ACCOUNTS: ${error.message}`);
+
+    if (!accountsConfig) {
+        throw new Error(
+            'ACCOUNTS environment variable is not set. ' +
+            'Please configure your trading accounts in the ACCOUNTS environment variable. ' +
+            'See .sample.env for the required format.'
+        );
+    }
+
+    try {
+        const accounts = parseEnvJson(accountsConfig) as AccountConfig[];
+
+        if (!Array.isArray(accounts)) {
+            throw new Error('ACCOUNTS must be a JSON array of account objects');
         }
+
+        if (accounts.length === 0) {
+            throw new Error('ACCOUNTS array cannot be empty. At least one account must be configured.');
+        }
+
+        validateAccounts(accounts);
+        return accounts;
+
+    } catch (error) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to parse ACCOUNTS environment variable: ${error.message}`);
+        }
+        throw error;
     }
-
-    // 2. Fallback to legacy single-account config
-    console.log('Using legacy environment variables for account configuration');
-    return [getLegacyAccountConfig()];
-}
-
-/**
- * Create an account config from legacy environment variables
- */
-function getLegacyAccountConfig(): AccountConfig {
-    const mode = getTradingMode();
-    const isPaper = mode !== TradingMode.LIVE;
-
-    // Determine keys based on mode
-    const keyId = isPaper ? process.env.PAPER_ALPACA_KEY_ID : process.env.LIVE_ALPACA_KEY_ID;
-    const secretKey = isPaper ? process.env.PAPER_ALPACA_SECRET_KEY : process.env.LIVE_ALPACA_SECRET_KEY;
-
-    if (!keyId || !secretKey) {
-        throw new Error(`Missing Alpaca credentials for ${mode} mode. Please set ${isPaper ? 'PAPER' : 'LIVE'}_ALPACA_KEY_ID and _SECRET_KEY.`);
-    }
-
-    return {
-        name: `Legacy ${mode} Account`,
-        key: keyId,
-        secret: secretKey,
-        isPaper: isPaper,
-        broker: BrokerType.ALPACA // Legacy configs always use Alpaca
-    };
 }
 
 /**

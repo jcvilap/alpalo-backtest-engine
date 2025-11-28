@@ -67,7 +67,7 @@ POLYGON_API_KEY=your_polygon_api_key_here
 # Slack Notifications (Optional)
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
-# Multi-Account Configuration (Recommended)
+# Multi-Account Configuration (Required)
 ACCOUNTS='[
   {
     "name": "Paper Account #1",
@@ -82,13 +82,6 @@ ACCOUNTS='[
     "isPaper": false
   }
 ]'
-
-# Legacy Single-Account Configuration (Alternative)
-# TRADING_MODE=PAPER
-# PAPER_ALPACA_KEY_ID=your_paper_key
-# PAPER_ALPACA_SECRET_KEY=your_paper_secret
-# LIVE_ALPACA_KEY_ID=your_live_key
-# LIVE_ALPACA_SECRET_KEY=your_live_secret
 ```
 
 ### 2. Account Configuration Format
