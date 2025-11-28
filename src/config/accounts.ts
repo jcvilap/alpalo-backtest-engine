@@ -1,12 +1,21 @@
 /**
  * Multi-Account Configuration
  *
- * This module handles the configuration for multiple Alpaca accounts.
- * It supports reading from a JSON-based environment variable (ACCOUNTS)
- * or falling back to legacy single-account environment variables.
+ * This module handles the configuration for multiple broker accounts.
+ * Supports Alpaca (paper and live) and Robinhood (live only).
+ * It reads from a JSON-based environment variable (ACCOUNTS)
+ * or falls back to legacy single-account environment variables.
  */
 
 import { TradingMode, getTradingMode } from './env';
+
+/**
+ * Supported broker types
+ */
+export enum BrokerType {
+    ALPACA = 'Alpaca',
+    ROBINHOOD = 'Robinhood'
+}
 
 /**
  * Configuration for a single trading account from ACCOUNTS env var
@@ -15,14 +24,17 @@ export interface AccountConfig {
     /** Display name for the account (e.g., "Account #1", "Live Trading") */
     name: string;
 
-    /** Alpaca API key */
+    /** Broker API key */
     key: string;
 
-    /** Alpaca API secret */
+    /** Broker API secret */
     secret: string;
 
     /** Whether this is a paper trading account */
     isPaper: boolean;
+
+    /** Broker to use (defaults to Alpaca for backward compatibility) */
+    broker?: BrokerType | string;
 }
 
 /**
@@ -103,7 +115,8 @@ function getLegacyAccountConfig(): AccountConfig {
         name: `Legacy ${mode} Account`,
         key: keyId,
         secret: secretKey,
-        isPaper: isPaper
+        isPaper: isPaper,
+        broker: BrokerType.ALPACA // Legacy configs always use Alpaca
     };
 }
 
@@ -128,9 +141,29 @@ function validateAccounts(accounts: AccountConfig[]): void {
             throw new Error(`Account ${account.name}: isPaper flag is required`);
         }
 
+        // Default broker to Alpaca if not specified (backward compatibility)
+        if (!account.broker) {
+            account.broker = BrokerType.ALPACA;
+        }
+
+        // Normalize broker name to enum value
+        const brokerUpper = account.broker.toString().toUpperCase();
+        if (brokerUpper === 'ALPACA') {
+            account.broker = BrokerType.ALPACA;
+        } else if (brokerUpper === 'ROBINHOOD') {
+            account.broker = BrokerType.ROBINHOOD;
+        } else {
+            throw new Error(`Account ${account.name}: Unsupported broker "${account.broker}". Supported: Alpaca, Robinhood`);
+        }
+
+        // Validate broker-specific constraints
+        if (account.broker === BrokerType.ROBINHOOD && account.isPaper) {
+            throw new Error(`Account ${account.name}: Robinhood does not support paper trading. Set isPaper to false or use Alpaca.`);
+        }
+
         // Safety warning for LIVE accounts
         if (!account.isPaper) {
-            console.warn(`⚠️  Account "${account.name}" is configured for LIVE TRADING. Ensure you have appropriate safety measures in place.`);
+            console.warn(`⚠️  Account "${account.name}" is configured for LIVE TRADING with ${account.broker}. Ensure you have appropriate safety measures in place.`);
         }
     }
 }

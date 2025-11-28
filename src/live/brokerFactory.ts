@@ -2,19 +2,22 @@
  * Broker Factory
  *
  * Creates broker instances configured for specific accounts.
- * Handles instantiation of Alpaca clients and brokers with proper credentials.
+ * Supports multiple broker types: Alpaca, Robinhood.
+ * Handles instantiation of appropriate clients and brokers with proper credentials.
  */
 
 import { Broker } from '../ports/Broker';
-import { AccountConfig } from '../config/accounts';
+import { AccountConfig, BrokerType } from '../config/accounts';
 import { AlpacaClient } from './alpacaClient';
 import { AlpacaBroker } from './AlpacaBroker';
+import { RobinhoodBroker } from './RobinhoodBroker';
 
 /**
  * Create a broker instance for a specific account
  *
- * @param config - Account configuration with credentials
+ * @param config - Account configuration with credentials and broker type
  * @returns Configured Broker instance ready for trading
+ * @throws Error if broker type is unsupported
  *
  * @example
  * ```typescript
@@ -24,11 +27,43 @@ import { AlpacaBroker } from './AlpacaBroker';
  * ```
  */
 export function createBroker(config: AccountConfig): Broker {
-    // Create AlpacaClient with direct credentials from config
-    const client = new AlpacaClient(config.key, config.secret);
+    // Default to Alpaca if broker not specified (backward compatibility)
+    const brokerType = config.broker || BrokerType.ALPACA;
 
-    // Create and return the broker
+    switch (brokerType) {
+        case BrokerType.ALPACA:
+            return createAlpacaBroker(config);
+
+        case BrokerType.ROBINHOOD:
+            return createRobinhoodBroker(config);
+
+        default:
+            throw new Error(`Unsupported broker type: ${brokerType}`);
+    }
+}
+
+/**
+ * Create an Alpaca broker instance
+ *
+ * @param config - Account configuration with Alpaca credentials
+ * @returns Configured AlpacaBroker instance
+ */
+function createAlpacaBroker(config: AccountConfig): Broker {
+    const client = new AlpacaClient(config.key, config.secret);
     return new AlpacaBroker(client);
+}
+
+/**
+ * Create a Robinhood broker instance
+ *
+ * IMPORTANT: This creates a placeholder RobinhoodBroker that will throw an error
+ * when used. Implement the Robinhood API client to enable actual trading.
+ *
+ * @param config - Account configuration with Robinhood credentials
+ * @returns Configured RobinhoodBroker instance (placeholder)
+ */
+function createRobinhoodBroker(config: AccountConfig): Broker {
+    return new RobinhoodBroker(config.key, config.secret);
 }
 
 /**

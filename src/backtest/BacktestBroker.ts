@@ -133,9 +133,31 @@ export class BacktestBroker implements Broker {
 
     /**
      * Execute a BUY order
+     *
+     * Supports both share-based and notional (dollar-based) orders
      */
     private executeBuy(order: Order, price: number): OrderResult {
-        const cost = order.shares * price;
+        // Calculate shares and cost based on order type
+        let shares: number;
+        let cost: number;
+
+        if (order.shares !== undefined) {
+            // Share-based order
+            shares = order.shares;
+            cost = shares * price;
+        } else if (order.notional !== undefined) {
+            // Dollar-based order (fractional shares)
+            cost = order.notional;
+            shares = cost / price;
+        } else {
+            return {
+                order,
+                success: false,
+                filledShares: 0,
+                fillPrice: price,
+                error: 'Order must specify either shares or notional'
+            };
+        }
 
         // Check if we have enough cash
         if (this.cash < cost) {
@@ -154,8 +176,8 @@ export class BacktestBroker implements Broker {
         // Update position
         if (this.position && this.position.symbol === order.symbol) {
             // Add to existing position
-            const totalShares = this.position.shares + order.shares;
-            const avgPrice = ((this.position.shares * this.position.avgEntryPrice) + (order.shares * price)) / totalShares;
+            const totalShares = this.position.shares + shares;
+            const avgPrice = ((this.position.shares * this.position.avgEntryPrice) + (shares * price)) / totalShares;
             this.position = {
                 symbol: order.symbol,
                 shares: totalShares,
@@ -165,7 +187,7 @@ export class BacktestBroker implements Broker {
             // New position
             this.position = {
                 symbol: order.symbol,
-                shares: order.shares,
+                shares: shares,
                 avgEntryPrice: price
             };
         }
@@ -173,13 +195,15 @@ export class BacktestBroker implements Broker {
         return {
             order,
             success: true,
-            filledShares: order.shares,
+            filledShares: shares,
             fillPrice: price
         };
     }
 
     /**
      * Execute a SELL order
+     *
+     * Supports both share-based and notional (dollar-based) orders
      */
     private executeSell(order: Order, price: number): OrderResult {
         // Check if we have a position to sell
@@ -193,8 +217,26 @@ export class BacktestBroker implements Broker {
             };
         }
 
-        // Determine how many shares to sell
-        const sellShares = Math.min(order.shares, this.position.shares);
+        // Calculate shares to sell based on order type
+        let sellShares: number;
+
+        if (order.shares !== undefined) {
+            // Share-based order
+            sellShares = Math.min(order.shares, this.position.shares);
+        } else if (order.notional !== undefined) {
+            // Dollar-based order - calculate shares from notional amount
+            const requestedShares = order.notional / price;
+            sellShares = Math.min(requestedShares, this.position.shares);
+        } else {
+            return {
+                order,
+                success: false,
+                filledShares: 0,
+                fillPrice: price,
+                error: 'Order must specify either shares or notional'
+            };
+        }
+
         const proceeds = sellShares * price;
 
         // Add to cash
