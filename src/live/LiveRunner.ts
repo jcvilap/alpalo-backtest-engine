@@ -36,7 +36,8 @@ export interface LiveExecutionResult {
     orders: Array<{
         symbol: string;
         side: string;
-        shares: number;
+        shares?: number;
+        notional?: number;
         status: string;
     }>;
 
@@ -192,7 +193,8 @@ export class LiveRunner {
                 orders: orderResults.map(r => ({
                     symbol: r.order.symbol,
                     side: r.order.side,
-                    shares: r.filledShares,
+                    shares: r.order.shares !== undefined ? r.filledShares : undefined,
+                    notional: r.order.notional !== undefined ? r.order.notional : undefined,
                     status: r.success ? 'FILLED' : 'FAILED'
                 })),
                 portfolio: {
@@ -358,6 +360,7 @@ export class LiveRunner {
                     symbol: o.symbol,
                     side: o.side,
                     shares: o.shares,
+                    notional: o.notional,
                     status: 'DRY_RUN'
                 })),
                 portfolio: {
