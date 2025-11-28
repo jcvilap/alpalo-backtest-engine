@@ -153,14 +153,27 @@ export class BacktestEngine {
                 const price = prices[order.symbol];
 
                 if (order.side === 'BUY') {
-                    const cost = order.shares * price;
+                    // Calculate shares and cost based on order type
+                    let shares: number;
+                    let cost: number;
+
+                    if (order.shares !== undefined) {
+                        shares = order.shares;
+                        cost = shares * price;
+                    } else if (order.notional !== undefined) {
+                        cost = order.notional;
+                        shares = cost / price;
+                    } else {
+                        continue; // Skip invalid orders
+                    }
+
                     if (cash >= cost) { // Basic check
                         cash -= cost;
 
                         if (currentPosition && currentPosition.symbol === order.symbol) {
                             // Add to existing
-                            const totalShares = currentPosition.shares + order.shares;
-                            const avgPrice = ((currentPosition.shares * currentPosition.entryPrice) + (order.shares * price)) / totalShares;
+                            const totalShares = currentPosition.shares + shares;
+                            const avgPrice = ((currentPosition.shares * currentPosition.entryPrice) + (shares * price)) / totalShares;
                             currentPosition.shares = totalShares;
                             currentPosition.entryPrice = avgPrice;
                         } else {
@@ -170,14 +183,25 @@ export class BacktestEngine {
                                 symbol: order.symbol,
                                 side: 'LONG',
                                 entryPrice: price,
-                                shares: order.shares,
+                                shares: shares,
                                 positionSizePct: (cost / totalEquity) * 100 // Estimate
                             };
                         }
                     }
                 } else if (order.side === 'SELL') {
                     if (currentPosition && currentPosition.symbol === order.symbol) {
-                        const sellShares = Math.min(order.shares, currentPosition.shares);
+                        // Calculate shares to sell based on order type
+                        let sellShares: number;
+
+                        if (order.shares !== undefined) {
+                            sellShares = Math.min(order.shares, currentPosition.shares);
+                        } else if (order.notional !== undefined) {
+                            const requestedShares = order.notional / price;
+                            sellShares = Math.min(requestedShares, currentPosition.shares);
+                        } else {
+                            continue; // Skip invalid orders
+                        }
+
                         const proceeds = sellShares * price;
                         cash += proceeds;
 

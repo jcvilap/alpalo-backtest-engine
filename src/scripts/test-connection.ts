@@ -23,11 +23,10 @@
  */
 
 import dotenv from 'dotenv';
-import { getConfiguredAccounts, BrokerType } from '../config/accounts';
+import { getConfiguredAccounts, BrokerType, AccountConfig } from '../config/accounts';
 import { AlpacaClient } from '../live/alpacaClient';
 import { AlpacaBroker } from '../live/AlpacaBroker';
 import { RobinhoodBroker } from '../live/RobinhoodBroker';
-import { createBroker } from '../live/brokerFactory';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -127,7 +126,7 @@ async function testRobinhoodAccount(accountName: string, key: string, secret: st
 /**
  * Test a single account connection
  */
-async function testAccount(account: any): Promise<TestResult> {
+async function testAccount(account: AccountConfig): Promise<TestResult> {
     const brokerType = account.broker || BrokerType.ALPACA;
     const result: TestResult = {
         accountName: account.name,
