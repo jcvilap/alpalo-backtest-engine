@@ -102,7 +102,8 @@ async function main() {
     }
 
     if (ranges.length === 0) {
-        ranges = ['10YR']; // Default
+        // Default to running all predefined timeframes
+        ranges = [...DATE_RANGE_OPTIONS];
     }
 
     // 1. Determine Fetch Range (widest possible)
