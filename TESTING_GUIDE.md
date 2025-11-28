@@ -690,7 +690,7 @@ All previous steps (1-14) cover backtest mode testing. This is the default mode 
 
 **Environment Variables:**
 ```bash
-TRADING_MODE=BACKTEST
+
 POLYGON_API_KEY=your_polygon_key
 ```
 
@@ -708,7 +708,7 @@ Paper mode simulates live trading with real market data but no actual money at r
 #### Action
 1. Add paper trading credentials to `.env.local`:
 ```bash
-TRADING_MODE=PAPER
+
 POLYGON_API_KEY=your_polygon_key
 ACCOUNTS='[{"name":"My Paper Account","key":"YOUR_PAPER_KEY","secret":"YOUR_PAPER_SECRET","isPaper":true,"broker":"Alpaca"}]'
 ```
@@ -775,14 +775,14 @@ Test 4: Fetching open orders...
 #### Action
 1. Add live trading credentials to `.env.local`:
 ```bash
-TRADING_MODE=LIVE
+
 POLYGON_API_KEY=your_polygon_key
 ACCOUNTS='[{"name":"My Live Account","key":"YOUR_LIVE_KEY","secret":"YOUR_LIVE_SECRET","isPaper":false,"broker":"Alpaca"}]'
 ```
 
 2. Test the Alpaca client (similar to paper mode):
 ```bash
-TRADING_MODE=LIVE npx tsx scripts/test-alpaca.ts
+npx tsx scripts/test-alpaca.ts
 ```
 
 #### Expected Output

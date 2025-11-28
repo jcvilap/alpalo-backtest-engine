@@ -54,8 +54,7 @@ cat > .env.local << EOF
 # Required: Polygon API for market data
 POLYGON_API_KEY=your_polygon_api_key_here
 
-# Trading Mode (BACKTEST | PAPER | LIVE)
-TRADING_MODE=BACKTEST
+
 
 # Multi-Account Configuration (required for PAPER/LIVE modes)
 ACCOUNTS='[{"name":"My Paper Account","key":"YOUR_PAPER_KEY","secret":"YOUR_PAPER_SECRET","isPaper":true,"broker":"Alpaca"}]'
@@ -83,7 +82,7 @@ Open [http://localhost:3003](http://localhost:3003) to view the application.
 
 ### Trading Modes
 
-The system supports three operating modes, configured via the `TRADING_MODE` environment variable:
+The system supports three operating modes:
 
 #### 1. BACKTEST (Default)
 - Analyzes historical performance using cached market data
@@ -92,7 +91,7 @@ The system supports three operating modes, configured via the `TRADING_MODE` env
 - Ideal for strategy testing and optimization
 
 ```bash
-TRADING_MODE=BACKTEST npm run dev
+npm run dev
 ```
 
 #### 2. PAPER
@@ -103,7 +102,6 @@ TRADING_MODE=BACKTEST npm run dev
 
 ```bash
 # Set environment variables
-TRADING_MODE=PAPER
 ACCOUNTS='[{"name":"My Paper Account","key":"YOUR_PAPER_KEY","secret":"YOUR_PAPER_SECRET","isPaper":true,"broker":"Alpaca"}]'
 
 npm run dev
@@ -117,7 +115,6 @@ npm run dev
 
 ```bash
 # Set environment variables
-TRADING_MODE=LIVE
 ACCOUNTS='[{"name":"My Live Account","key":"YOUR_LIVE_KEY","secret":"YOUR_LIVE_SECRET","isPaper":false,"broker":"Alpaca"}]'
 
 npm run dev
@@ -137,7 +134,7 @@ npm run dev
 │   │   └── BacktestRunner.ts      # Backtest orchestration
 │   ├── components/    # React UI components
 │   ├── config/        # Configuration and environment management
-│   │   ├── env.ts                 # Trading mode configuration
+│   │   ├── env.ts                 # Environment configuration
 │   │   └── secrets.ts             # API credentials management
 │   ├── lib/           # Core logic (strategy, backtest engine, data client)
 │   ├── live/          # Live and paper trading implementation
