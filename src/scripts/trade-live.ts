@@ -8,8 +8,9 @@
  * comprehensive error handling and notification support.
  *
  * Usage:
- *   tsx src/scripts/trade-live.ts              # Execute for all configured accounts
- *   tsx src/scripts/trade-live.ts --dry-run    # Dry run mode (no real orders)
+ *   tsx src/scripts/trade-live.ts                    # Execute for all configured accounts
+ *   tsx src/scripts/trade-live.ts --dry-run          # Dry run mode (no real orders)
+ *   tsx src/scripts/trade-live.ts --skip-market-check # Skip market schedule validation (testing)
  *
  * Environment Variables Required:
  *   - POLYGON_API_KEY: Polygon API key for market data
@@ -28,6 +29,8 @@ import { createBroker } from '../live/brokerFactory';
 import { SlackNotifier } from '../adapters/SlackNotifier';
 import { LiveRunner } from '../live/LiveRunner';
 import { createDefaultStrategyParams } from '../strategy/engine';
+import { AlpacaClient } from '../live/alpacaClient';
+import { getMarketStatus, isAppropriateForMOC, formatMinutes } from '../lib/market/schedule';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -121,9 +124,14 @@ async function main() {
     // Parse command line arguments
     const args = process.argv.slice(2);
     const isDryRun = args.includes('--dry-run');
+    const skipMarketCheck = args.includes('--skip-market-check');
 
     if (isDryRun) {
         console.log(`${colors.yellow}⚠️  DRY RUN MODE - No real orders will be placed${colors.reset}\n`);
+    }
+
+    if (skipMarketCheck) {
+        console.log(`${colors.yellow}⚠️  SKIPPING MARKET SCHEDULE CHECK${colors.reset}\n`);
     }
 
     // Get configured accounts
@@ -145,6 +153,52 @@ async function main() {
         console.log(`${colors.gray}   - ${account.name} (${account.isPaper ? 'PAPER' : 'LIVE'})${colors.reset}`);
     }
     console.log();
+
+    // Check market schedule (unless skipped)
+    if (!skipMarketCheck) {
+        console.log(`${colors.blue}🕐 Checking market schedule...${colors.reset}`);
+
+        try {
+            // Use first account to check market status (all accounts share the same market)
+            const testClient = new AlpacaClient(accounts[0].key, accounts[0].secret);
+            const marketStatus = await getMarketStatus(testClient);
+
+            console.log(`${colors.gray}   Market is: ${marketStatus.isOpen ? 'OPEN' : 'CLOSED'}${colors.reset}`);
+
+            if (!marketStatus.isOpen) {
+                console.error(`${colors.red}❌ Market is currently CLOSED${colors.reset}`);
+                console.log(`${colors.gray}   Next open: ${new Date(marketStatus.nextOpen).toLocaleString()}${colors.reset}`);
+                console.log(`${colors.yellow}\n💡 Tip: Use --skip-market-check to bypass this check for testing${colors.reset}\n`);
+                process.exit(1);
+            }
+
+            console.log(`${colors.green}✓ Market is open${colors.reset}`);
+
+            // Check if appropriate timing for MOC orders
+            const mocCheck = await isAppropriateForMOC(testClient, 30, 5);
+
+            if (mocCheck.minutesToClose !== undefined) {
+                const timeStr = formatMinutes(mocCheck.minutesToClose);
+                console.log(`${colors.gray}   Time to close: ${timeStr}${colors.reset}`);
+            }
+
+            if (!mocCheck.appropriate && mocCheck.reason) {
+                // This is a warning, not a hard stop
+                console.log(`${colors.yellow}⚠️  WARNING: ${mocCheck.reason}${colors.reset}`);
+                console.log(`${colors.yellow}   This strategy typically executes MOC (Market-On-Close) orders.${colors.reset}`);
+                console.log(`${colors.yellow}   Proceeding anyway, but timing may not be optimal.${colors.reset}`);
+            } else if (mocCheck.appropriate) {
+                console.log(`${colors.green}✓ Good timing for MOC orders${colors.reset}`);
+            }
+
+            console.log();
+
+        } catch (error) {
+            console.error(`${colors.red}❌ Failed to check market schedule:${colors.reset}`, error);
+            console.log(`${colors.yellow}💡 Tip: Use --skip-market-check to bypass this check${colors.reset}\n`);
+            process.exit(1);
+        }
+    }
 
     // Initialize shared PolygonLiveDataFeed
     console.log(`${colors.blue}🔄 Initializing Polygon data feed...${colors.reset}`);
