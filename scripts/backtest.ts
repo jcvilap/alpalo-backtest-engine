@@ -164,11 +164,10 @@ async function main() {
             // Multi Mode
             console.log(`${colors.gray}⚡ Running backtests for: ${ranges.join(', ')}...${colors.reset}`);
 
-            const results = [];
-            for (const config of rangeConfigs) {
+            const results = await Promise.all(rangeConfigs.map(async (config) => {
                 const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end);
-                results.push({ range: config.label, result });
-            }
+                return { range: config.label, result };
+            }));
 
             printComparisonTable(results, { mode: 'cli' });
         }
