@@ -27,7 +27,9 @@
     "backtest:20YR": "tsx scripts/backtest.ts 20YR",
     "backtest:ALL": "tsx scripts/backtest.ts ALL",
     "trade:live": "tsx src/scripts/trade-live.ts",
-    "trade:dry-run": "tsx src/scripts/trade-live.ts --dry-run"
+    "trade:dry-run": "tsx src/scripts/trade-live.ts --dry-run",
+    "test-connection:alpaca": "tsx src/scripts/test-alpaca-connection.ts",
+    "test-connection:robinhood": "tsx src/scripts/test-robinhood-connection.ts"
   },
   "dependencies": {
     "@alpacahq/alpaca-trade-api": "^3.1.3",
