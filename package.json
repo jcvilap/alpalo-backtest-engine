@@ -25,7 +25,9 @@
     "backtest:12YR": "tsx scripts/backtest.ts 12YR",
     "backtest:15YR": "tsx scripts/backtest.ts 15YR",
     "backtest:20YR": "tsx scripts/backtest.ts 20YR",
-    "backtest:ALL": "tsx scripts/backtest.ts ALL"
+    "backtest:ALL": "tsx scripts/backtest.ts ALL",
+    "trade:live": "tsx src/scripts/trade-live.ts",
+    "trade:dry-run": "tsx src/scripts/trade-live.ts --dry-run"
   },
   "dependencies": {
     "@alpacahq/alpaca-trade-api": "^3.1.3",
