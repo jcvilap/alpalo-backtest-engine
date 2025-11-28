@@ -87,25 +87,39 @@ export class AlpacaBroker implements Broker {
      * Execute a single order
      */
     private async executeSingleOrder(order: Order): Promise<OrderResult> {
+        // Validate order has either shares or notional, but not both
+        if ((order.shares && order.notional) || (!order.shares && !order.notional)) {
+            throw new Error('Order must specify either shares OR notional, but not both');
+        }
+
         // Convert our Order format to Alpaca format
         const alpacaOrder: AlpacaOrderRequest = {
             symbol: order.symbol,
-            qty: order.shares,
             side: order.side.toLowerCase() as 'buy' | 'sell',
             type: 'market',
             time_in_force: 'day'
         };
+
+        // Add either qty (shares) or notional (dollar amount)
+        if (order.shares !== undefined) {
+            alpacaOrder.qty = order.shares;
+        } else if (order.notional !== undefined) {
+            alpacaOrder.notional = order.notional;
+        }
 
         // Submit the order
         const response = await this.client.submitOrder(alpacaOrder);
 
         // For market orders, we assume immediate fill
         // In production, you might want to poll the order status
+        const filledShares = parseFloat(response.filled_qty) || 0;
+        const fillPrice = parseFloat(response.filled_avg_price || '0') || 0;
+
         return {
             order: order,
             success: true,
-            filledShares: parseFloat(response.filled_qty) || order.shares,
-            fillPrice: parseFloat(response.filled_avg_price || '0') || 0,
+            filledShares: filledShares,
+            fillPrice: fillPrice,
         };
     }
 
