@@ -108,6 +108,11 @@ export class PolygonClient {
                 }
             });
 
+        // Manual patch for 2025 holidays that might be in the past (API only returns upcoming)
+        if (year === 2025) {
+            holidayDates.add('2025-11-27'); // Thanksgiving
+        }
+
         const tradingDays = this.computeTradingDaysForYear(year, holidayDates);
         const calendar: MarketCalendar = {
             year,
