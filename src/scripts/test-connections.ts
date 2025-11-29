@@ -242,15 +242,47 @@ async function testAlpacaAccount(account: AccountConfig): Promise<BrokerTestResu
  * Test all broker accounts
  */
 async function testBrokers(): Promise<BrokerTestResult[]> {
+    const startTime = Date.now();
+
     try {
         const accounts = getConfiguredAccounts();
+
+        if (accounts.length === 0) {
+            // No accounts configured - return a special result
+            return [{
+                service: 'broker',
+                accountName: 'Broker Accounts',
+                broker: 'N/A',
+                isPaper: false,
+                configured: false,
+                success: false,
+                error: 'No broker accounts configured in ACCOUNTS environment variable',
+                duration: Date.now() - startTime
+            }];
+        }
 
         // Test all accounts in parallel
         const promises = accounts.map(account => testAlpacaAccount(account));
         return await Promise.all(promises);
     } catch (error) {
-        console.warn(`Failed to load accounts: ${error instanceof Error ? error.message : String(error)}`);
-        return [];
+        // Failed to parse/load accounts - return error result
+        let errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Add helpful hints for common JSON errors
+        if (errorMessage.includes('not valid JSON') || errorMessage.includes('JSON')) {
+            errorMessage += '\n   Hint: Check for trailing commas, missing quotes, or invalid escape sequences in ACCOUNTS';
+        }
+
+        return [{
+            service: 'broker',
+            accountName: 'Broker Accounts',
+            broker: 'N/A',
+            isPaper: false,
+            configured: true,
+            success: false,
+            error: errorMessage,
+            duration: Date.now() - startTime
+        }];
     }
 }
 
@@ -297,9 +329,15 @@ function printResults(results: TestResult[]) {
 
         for (const result of brokerResults) {
             const icon = result.success ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
-            const modeTag = result.isPaper ? `${colors.gray}[PAPER]${colors.reset}` : `${colors.yellow}[LIVE]${colors.reset}`;
 
-            console.log(`${icon} ${colors.bright}${result.accountName}${colors.reset} ${modeTag} ${colors.gray}(${result.duration}ms)${colors.reset}`);
+            // Don't show mode tag if this is a failed account loading result
+            let displayName = result.accountName;
+            if (result.broker !== 'N/A') {
+                const modeTag = result.isPaper ? `${colors.gray}[PAPER]${colors.reset}` : `${colors.yellow}[LIVE]${colors.reset}`;
+                displayName = `${result.accountName} ${modeTag}`;
+            }
+
+            console.log(`${icon} ${colors.bright}${displayName}${colors.reset} ${colors.gray}(${result.duration}ms)${colors.reset}`);
 
             if (result.success && result.details) {
                 if (result.details.accountId) {
@@ -312,7 +350,15 @@ function printResults(results: TestResult[]) {
                     console.log(`${colors.gray}   Equity: $${result.details.equity.toFixed(2)}${colors.reset}`);
                 }
             } else if (result.error) {
-                console.log(`${colors.red}   Error: ${result.error}${colors.reset}`);
+                // Split error message by newlines to preserve formatting (for hints)
+                const errorLines = result.error.split('\n');
+                errorLines.forEach((line, index) => {
+                    if (index === 0) {
+                        console.log(`${colors.red}   ${line}${colors.reset}`);
+                    } else {
+                        console.log(`${colors.yellow}   ${line}${colors.reset}`);
+                    }
+                });
             }
         }
     }
