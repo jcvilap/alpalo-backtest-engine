@@ -113,7 +113,12 @@ export class LiveRunner {
      * @returns Execution result with decision, orders, and portfolio state
      */
     async runOnce(date?: string): Promise<LiveExecutionResult> {
-        const executionDate = date || new Date().toISOString().split('T')[0];
+        const executionDate = date || new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/New_York',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(new Date());
         const prefix = this.getLogPrefix();
 
         // Send starting notification
@@ -303,7 +308,12 @@ export class LiveRunner {
      * @returns What would have been executed (without actual orders)
      */
     async dryRun(date?: string): Promise<LiveExecutionResult> {
-        const executionDate = date || new Date().toISOString().split('T')[0];
+        const executionDate = date || new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/New_York',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(new Date());
         const prefix = this.getLogPrefix();
 
         // Send starting notification
