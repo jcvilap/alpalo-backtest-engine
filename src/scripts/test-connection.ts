@@ -17,9 +17,7 @@
  *   pnpm test-connection
  *
  * Environment Variables Required:
- *   - ACCOUNTS: JSON array of account configurations
- *   OR
- *   - Legacy Alpaca credentials (PAPER/LIVE_ALPACA_KEY_ID, etc.)
+ *   - ACCOUNTS: JSON array of account configurations (required)
  */
 
 import dotenv from 'dotenv';
@@ -264,7 +262,7 @@ async function main() {
 
     if (accounts.length === 0) {
         console.error(`${colors.red}❌ No accounts configured${colors.reset}`);
-        console.error(`${colors.yellow}Please configure accounts using ACCOUNTS env var or legacy credentials${colors.reset}\n`);
+        console.error(`${colors.yellow}Please configure accounts using ACCOUNTS environment variable. See .sample.env for format.${colors.reset}\n`);
         process.exit(1);
     }
 

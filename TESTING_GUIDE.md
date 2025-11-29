@@ -690,7 +690,7 @@ All previous steps (1-14) cover backtest mode testing. This is the default mode 
 
 **Environment Variables:**
 ```bash
-TRADING_MODE=BACKTEST
+
 POLYGON_API_KEY=your_polygon_key
 ```
 
@@ -708,10 +708,9 @@ Paper mode simulates live trading with real market data but no actual money at r
 #### Action
 1. Add paper trading credentials to `.env.local`:
 ```bash
-TRADING_MODE=PAPER
+
 POLYGON_API_KEY=your_polygon_key
-PAPER_ALPACA_KEY_ID=your_paper_key_id
-PAPER_ALPACA_SECRET_KEY=your_paper_secret_key
+ACCOUNTS='[{"name":"My Paper Account","key":"YOUR_PAPER_KEY","secret":"YOUR_PAPER_SECRET","isPaper":true,"broker":"Alpaca"}]'
 ```
 
 2. Test the Alpaca client:
@@ -757,9 +756,9 @@ Test 4: Fetching open orders...
 - [ ] No authentication errors
 
 #### Common Issues
-- **Error: "Invalid credentials"** → Check your PAPER_ALPACA_KEY_ID and PAPER_ALPACA_SECRET_KEY
+- **Error: "Invalid credentials"** → Check your ACCOUNTS configuration and ensure keys are correct
 - **Error: "Request failed"** → Verify internet connection and Alpaca API status
-- **403 Forbidden** → Credentials may be for live trading instead of paper trading
+- **403 Forbidden** → Credentials may be for live trading instead of paper trading (check isPaper flag)
 
 ---
 
@@ -776,15 +775,14 @@ Test 4: Fetching open orders...
 #### Action
 1. Add live trading credentials to `.env.local`:
 ```bash
-TRADING_MODE=LIVE
+
 POLYGON_API_KEY=your_polygon_key
-LIVE_ALPACA_KEY_ID=your_live_key_id
-LIVE_ALPACA_SECRET_KEY=your_live_secret_key
+ACCOUNTS='[{"name":"My Live Account","key":"YOUR_LIVE_KEY","secret":"YOUR_LIVE_SECRET","isPaper":false,"broker":"Alpaca"}]'
 ```
 
 2. Test the Alpaca client (similar to paper mode):
 ```bash
-TRADING_MODE=LIVE npx tsx scripts/test-alpaca.ts
+npx tsx scripts/test-alpaca.ts
 ```
 
 #### Expected Output
@@ -870,8 +868,8 @@ Fetching snapshot for 2025-11-26...
 | Mode | Required Variables | Use Case |
 |------|-------------------|----------|
 | **BACKTEST** | `POLYGON_API_KEY` | Historical analysis, no trading |
-| **PAPER** | `POLYGON_API_KEY`<br>`PAPER_ALPACA_KEY_ID`<br>`PAPER_ALPACA_SECRET_KEY` | Simulated trading, no risk |
-| **LIVE** | `POLYGON_API_KEY`<br>`LIVE_ALPACA_KEY_ID`<br>`LIVE_ALPACA_SECRET_KEY` | Real trading, real money |
+| **PAPER** | `POLYGON_API_KEY`<br>`ACCOUNTS` (with `isPaper: true`) | Simulated trading, no risk |
+| **LIVE** | `POLYGON_API_KEY`<br>`ACCOUNTS` (with `isPaper: false`) | Real trading, real money |
 
 Optional for all modes:
 - `SLACK_WEBHOOK_URL` - For trade notifications

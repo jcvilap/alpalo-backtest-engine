@@ -54,16 +54,10 @@ cat > .env.local << EOF
 # Required: Polygon API for market data
 POLYGON_API_KEY=your_polygon_api_key_here
 
-# Trading Mode (BACKTEST | PAPER | LIVE)
-TRADING_MODE=BACKTEST
 
-# Paper Trading Credentials (optional, for PAPER mode)
-PAPER_ALPACA_KEY_ID=your_paper_key_id
-PAPER_ALPACA_SECRET_KEY=your_paper_secret_key
 
-# Live Trading Credentials (optional, for LIVE mode)
-LIVE_ALPACA_KEY_ID=your_live_key_id
-LIVE_ALPACA_SECRET_KEY=your_live_secret_key
+# Multi-Account Configuration (required for PAPER/LIVE modes)
+ACCOUNTS='[{"name":"My Paper Account","key":"YOUR_PAPER_KEY","secret":"YOUR_PAPER_SECRET","isPaper":true,"broker":"Alpaca"}]'
 
 # Slack Notifications (optional)
 SLACK_WEBHOOK_URL=your_slack_webhook_url
@@ -88,7 +82,7 @@ Open [http://localhost:3003](http://localhost:3003) to view the application.
 
 ### Trading Modes
 
-The system supports three operating modes, configured via the `TRADING_MODE` environment variable:
+The system supports three operating modes:
 
 #### 1. BACKTEST (Default)
 - Analyzes historical performance using cached market data
@@ -97,7 +91,7 @@ The system supports three operating modes, configured via the `TRADING_MODE` env
 - Ideal for strategy testing and optimization
 
 ```bash
-TRADING_MODE=BACKTEST npm run dev
+npm run dev
 ```
 
 #### 2. PAPER
@@ -108,9 +102,7 @@ TRADING_MODE=BACKTEST npm run dev
 
 ```bash
 # Set environment variables
-TRADING_MODE=PAPER
-PAPER_ALPACA_KEY_ID=your_paper_key
-PAPER_ALPACA_SECRET_KEY=your_paper_secret
+ACCOUNTS='[{"name":"My Paper Account","key":"YOUR_PAPER_KEY","secret":"YOUR_PAPER_SECRET","isPaper":true,"broker":"Alpaca"}]'
 
 npm run dev
 ```
@@ -119,13 +111,11 @@ npm run dev
 - Real trading with actual capital
 - Orders executed on live markets via Alpaca API
 - ⚠️ **USE WITH CAUTION** - Real money at risk
-- Requires live trading credentials
+- Requires live trading credentials configured in ACCOUNTS
 
 ```bash
 # Set environment variables
-TRADING_MODE=LIVE
-LIVE_ALPACA_KEY_ID=your_live_key
-LIVE_ALPACA_SECRET_KEY=your_live_secret
+ACCOUNTS='[{"name":"My Live Account","key":"YOUR_LIVE_KEY","secret":"YOUR_LIVE_SECRET","isPaper":false,"broker":"Alpaca"}]'
 
 npm run dev
 ```
@@ -144,7 +134,7 @@ npm run dev
 │   │   └── BacktestRunner.ts      # Backtest orchestration
 │   ├── components/    # React UI components
 │   ├── config/        # Configuration and environment management
-│   │   ├── env.ts                 # Trading mode configuration
+│   │   ├── env.ts                 # Environment configuration
 │   │   └── secrets.ts             # API credentials management
 │   ├── lib/           # Core logic (strategy, backtest engine, data client)
 │   ├── live/          # Live and paper trading implementation
