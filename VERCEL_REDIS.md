@@ -27,9 +27,11 @@ Before implementing the code changes, you need to provision a Vercel KV database
 
 ## 2. Implementation Plan
 
-The goal is to refactor `PolygonClient` to use a "Hybrid Caching Strategy":
--   **Development (`NODE_ENV=development`)**: Continue using the local file system (`cache/` folder). This is free, fast, and easy to debug.
--   **Production (`NODE_ENV=production`)**: Use Vercel KV. This avoids the need to commit cache files and provides persistence across deployments.
+The goal is to refactor `PolygonClient` to use a simple binary strategy:
+-   **Local (`NODE_ENV=development`)**: Use the local file system (`cache/` folder).
+-   **Production (`NODE_ENV=production`)**: Use Vercel KV.
+
+*Note: We do not need separate caches for preview/staging environments. It's just Local (Files) vs. Production (KV).*
 
 ### Dependencies
 You will need to install the Vercel KV SDK:
@@ -59,14 +61,14 @@ Use the following prompt to have an AI assistant implement the changes for you.
 **Objective**: Refactor `src/lib/polygon/client.ts` to support a hybrid caching mechanism using Vercel KV for production and the local file system for development.
 
 **Context**:
-Currently, `PolygonClient` stores market data (OHLC) in local JSON files within the `cache/` directory. We want to move this to Vercel KV (Redis) in production to avoid committing cache files and to ensure persistence in a serverless environment.
+Currently, `PolygonClient` stores market data (OHLC) in local JSON files within the `cache/` directory. We want to move this to Vercel KV (Redis) **only for production** to avoid committing cache files. Local development should continue to use the file system. We have a simple setup: Local vs. Production.
 
 **Requirements**:
 1.  **Install Dependency**: I will run `pnpm add @vercel/kv` myself, assume it is available.
-2.  **Hybrid Logic**:
-    -   Check `process.env.KV_REST_API_URL` and `process.env.NODE_ENV`.
-    -   **IF** `KV_REST_API_URL` is present AND `NODE_ENV === 'production'`: Use Vercel KV.
-    -   **ELSE**: Fallback to the existing local file system logic (`fs.readFileSync`, `fs.writeFileSync`).
+2.  **Simple Environment Logic**:
+    -   **IF** `NODE_ENV === 'production'`: Use Vercel KV.
+    -   **ELSE** (Local): Fallback to the existing local file system logic (`fs.readFileSync`, `fs.writeFileSync`).
+    -   *No need for complex environment checks or separate keys for staging.*
 3.  **Refactor Methods**:
     -   Update `loadCache(ticker)` to be `async` and fetch from KV in production.
     -   Update `saveCache(ticker, data)` to be `async` and write to KV in production.
