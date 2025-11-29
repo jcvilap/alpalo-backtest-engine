@@ -346,9 +346,9 @@ export class PolygonClient {
     }
 
     private getTailFetchStart(reqEnd: Date, lastCachedEnd: Date): Date {
-        const monthAgo = subMonths(reqEnd, 1);
-        const nextExpected = addDays(lastCachedEnd, 1);
-        return monthAgo < nextExpected ? monthAgo : nextExpected;
+        // Optimization: Only fetch the days we are missing, don't re-fetch the last month
+        // This prevents redundant "CACHE MISS TAIL" logs and API calls when we just need the latest day
+        return addDays(lastCachedEnd, 1);
     }
 
     private async populateMissingTradingDays(data: OHLC[], reqEnd: Date, lastCachedEnd: Date): Promise<OHLC[]> {
