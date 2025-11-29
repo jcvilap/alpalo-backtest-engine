@@ -21,7 +21,7 @@
 
 // IMPORTANT: Load environment variables BEFORE any other imports
 import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+dotenv.config(); // Loads .env file from project root
 
 import { createClient, RedisClientType } from 'redis';
 import { WebClient } from '@slack/web-api';

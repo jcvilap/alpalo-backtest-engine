@@ -20,14 +20,14 @@
  *   - ACCOUNTS: JSON array of account configurations (required)
  */
 
+// Load environment variables BEFORE other imports
 import dotenv from 'dotenv';
+dotenv.config(); // Loads .env file from project root
+
 import { getConfiguredAccounts, BrokerType, AccountConfig } from '../config/accounts';
 import { AlpacaClient } from '../live/alpacaClient';
 import { AlpacaBroker } from '../live/AlpacaBroker';
 import { RobinhoodBroker } from '../live/RobinhoodBroker';
-
-// Load environment variables
-dotenv.config({ path: '.env.local' });
 
 // ANSI color codes
 const colors = {
