@@ -16,9 +16,8 @@ export function toNYDate(date: Date | string | number): Date {
  * Returns the current date/time in New York.
  */
 export function getNYNow(): Date {
-    // Compute current time in New York timezone and return the start of that day.
-    const nyNow = toZonedTime(new Date(), NY_TIMEZONE);
-    return startOfDay(nyNow);
+    // Compute current time in New York timezone
+    return toZonedTime(new Date(), NY_TIMEZONE);
 }
 
 /**

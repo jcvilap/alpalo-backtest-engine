@@ -136,7 +136,7 @@ export class LiveRunner {
                 totalEquity: portfolio.totalEquity
             });
 
-            console.log(`${prefix} Strategy decision:`, decision);
+            // console.log(`${prefix} Strategy decision:`, decision);
 
             // 2. Calculate required orders
             const orders = this.portfolioManager.calculateOrders(
@@ -274,7 +274,7 @@ export class LiveRunner {
                 totalEquity: portfolio.totalEquity
             });
 
-            console.log(`${prefix} Strategy decision:`, decision);
+            // console.log(`${prefix} Strategy decision:`, decision);
 
             const orders = this.portfolioManager.calculateOrders(
                 decision,
