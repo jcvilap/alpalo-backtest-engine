@@ -12,7 +12,7 @@
 import { DataFeed } from '../ports/DataFeed';
 import { Broker, OrderResult } from '../ports/Broker';
 import { runStrategy } from '../strategy/engine';
-import { StrategyParams, StrategyDecision } from '../strategy/types';
+import { StrategyParams, StrategyDecision, MarketSnapshot } from '../strategy/types';
 import { PortfolioManager } from '../lib/trade/PortfolioManager';
 import { Notifier, NotificationLevel } from '../ports/Notifier';
 import { AccountConfig } from '../config/accounts';
@@ -108,7 +108,7 @@ export class LiveRunner {
      * @param snapshot - Market snapshot used for the decision
      * @returns Execution result
      */
-    async executeDecision(decision: StrategyDecision, snapshot: any): Promise<LiveExecutionResult> {
+    async executeDecision(decision: StrategyDecision, snapshot: MarketSnapshot): Promise<LiveExecutionResult> {
         const executionDate = snapshot.date;
         const prefix = this.getLogPrefix();
 
@@ -246,7 +246,7 @@ export class LiveRunner {
      * @param snapshot - Market snapshot used for the decision
      * @returns Execution result
      */
-    async dryRunDecision(decision: StrategyDecision, snapshot: any): Promise<LiveExecutionResult> {
+    async dryRunDecision(decision: StrategyDecision, snapshot: MarketSnapshot): Promise<LiveExecutionResult> {
         const executionDate = snapshot.date;
         const prefix = this.getLogPrefix();
 

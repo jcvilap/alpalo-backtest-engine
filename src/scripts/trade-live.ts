@@ -31,6 +31,7 @@ import { createBroker } from '../live/brokerFactory';
 import { SlackNotifier } from '../adapters/SlackNotifier';
 import { LiveRunner } from '../live/LiveRunner';
 import { createDefaultStrategyParams } from '../strategy/engine';
+import { StrategyDecision, MarketSnapshot } from '../strategy/types';
 import { AlpacaClient } from '../live/alpacaClient';
 import { getMarketStatus, isAppropriateForMOC, formatMinutes, getNyDate } from '../lib/market/schedule';
 
@@ -61,8 +62,8 @@ async function executeAccount(
     totalAccounts: number,
     dataFeed: PolygonLiveDataFeed,
     isDryRun: boolean,
-    decision: any,
-    snapshot: any
+    decision: StrategyDecision,
+    snapshot: MarketSnapshot
 ): Promise<{ success: boolean; accountName: string; error?: Error }> {
     const accounts = getConfiguredAccounts();
     const account = accounts[accountIndex];
