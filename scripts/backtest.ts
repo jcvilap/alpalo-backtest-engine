@@ -209,6 +209,11 @@ async function main() {
             const range = getDateRange(r as DateRangeKey);
             start = range.startDate;
             end = range.endDate;
+        } else if (r.includes(':')) {
+            // Custom range: YYYY-MM-DD:YYYY-MM-DD
+            const [s, e] = r.split(':');
+            start = s;
+            end = e;
         } else {
             // Assume custom date or just start date
             start = r;
