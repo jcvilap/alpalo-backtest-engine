@@ -20,8 +20,8 @@
  */
 
 // IMPORTANT: Load environment variables BEFORE any other imports
-import dotenv from 'dotenv';
-dotenv.config(); // Loads .env file from project root
+// IMPORTANT: Load environment variables BEFORE any other imports
+import 'dotenv/config'; // Loads .env file from project root
 
 import { createClient, RedisClientType } from 'redis';
 import { WebClient } from '@slack/web-api';
@@ -403,12 +403,12 @@ function printResults(results: TestResult[], cacheEntries: CacheEntry[] | null) 
 
     for (const result of serviceResults) {
         const icon = !result.configured ? `${colors.yellow}⊘${colors.reset}`
-                   : result.success ? `${colors.green}✓${colors.reset}`
-                   : `${colors.red}✗${colors.reset}`;
+            : result.success ? `${colors.green}✓${colors.reset}`
+                : `${colors.red}✗${colors.reset}`;
 
         const status = !result.configured ? `${colors.yellow}NOT CONFIGURED${colors.reset}`
-                     : result.success ? `${colors.green}CONNECTED${colors.reset}`
-                     : `${colors.red}FAILED${colors.reset}`;
+            : result.success ? `${colors.green}CONNECTED${colors.reset}`
+                : `${colors.red}FAILED${colors.reset}`;
 
         console.log(`${icon} ${colors.bright}${result.service.padEnd(15)}${colors.reset} ${status} ${colors.gray}(${result.duration}ms)${colors.reset}`);
 

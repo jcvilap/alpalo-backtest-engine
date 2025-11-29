@@ -24,8 +24,8 @@
 
 // IMPORTANT: Load environment variables BEFORE any other imports
 // PolygonLiveDataFeed uses PolygonClient which initializes Redis at module level
-import dotenv from 'dotenv';
-dotenv.config(); // Loads .env file from project root
+// PolygonLiveDataFeed uses PolygonClient which initializes Redis at module level
+import 'dotenv/config'; // Loads .env file from project root
 
 import { getConfiguredAccounts } from '../config/accounts';
 import { PolygonLiveDataFeed } from '../live/PolygonLiveDataFeed';

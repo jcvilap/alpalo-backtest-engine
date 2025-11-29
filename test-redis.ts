@@ -1,8 +1,6 @@
 import { createClient } from 'redis';
-import { config } from 'dotenv';
-
 // Load environment variables
-config();
+import 'dotenv/config';
 
 async function testRedis() {
     console.log('Starting Redis connection test...');

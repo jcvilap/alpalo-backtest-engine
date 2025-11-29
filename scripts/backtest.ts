@@ -12,8 +12,8 @@
  */
 
 // Load environment variables BEFORE other imports (PolygonClient initializes Redis at module level)
-import dotenv from 'dotenv';
-dotenv.config(); // Loads .env file from project root
+// Load environment variables BEFORE other imports (PolygonClient initializes Redis at module level)
+import 'dotenv/config'; // Loads .env file from project root
 
 import { OHLC } from '../src/lib/types';
 import { BacktestResult } from '../src/lib/backtest/backtestEngine';

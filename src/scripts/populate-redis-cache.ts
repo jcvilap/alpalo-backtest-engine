@@ -8,8 +8,7 @@
 
 // IMPORTANT: Load environment variables BEFORE any other imports
 // that depend on them (like PolygonClient which initializes Redis at module level)
-import dotenv from 'dotenv';
-dotenv.config(); // Loads .env file from project root
+import 'dotenv/config'; // Loads .env file from project root
 
 import { createClient } from 'redis';
 import { PolygonClient } from '../lib/polygon/client';
