@@ -15,25 +15,25 @@
  * Environment Variables Required:
  *   - POLYGON_API_KEY: Polygon API key for market data
  *   - ACCOUNTS: JSON array of account configurations (or legacy env vars)
- *   - SLACK_WEBHOOK_URL: Optional Slack webhook for notifications
+ *   - SLACK_TOKEN: Optional Slack API token for notifications
  *
  * Exit Codes:
  *   - 0: All accounts executed successfully
  *   - 1: One or more accounts failed
  */
 
-import dotenv from 'dotenv';
+// IMPORTANT: Load environment variables BEFORE any other imports
+import 'dotenv/config'; // Loads .env file from project root
+
 import { getConfiguredAccounts } from '../config/accounts';
 import { PolygonLiveDataFeed } from '../live/PolygonLiveDataFeed';
 import { createBroker } from '../live/brokerFactory';
 import { SlackNotifier } from '../adapters/SlackNotifier';
 import { LiveRunner } from '../live/LiveRunner';
 import { createDefaultStrategyParams } from '../strategy/engine';
+import { StrategyDecision, MarketSnapshot } from '../strategy/types';
 import { AlpacaClient } from '../live/alpacaClient';
-import { getMarketStatus, isAppropriateForMOC, formatMinutes } from '../lib/market/schedule';
-
-// Load environment variables
-dotenv.config({ path: '.env.local' });
+import { getMarketStatus, isAppropriateForMOC, formatMinutes, getNyDate } from '../lib/market/schedule';
 
 // ANSI color codes for terminal output
 const colors = {
@@ -55,13 +55,15 @@ async function delay(ms: number): Promise<void> {
 }
 
 /**
- * Execute trading for a single account
+ * Execute trading for a single account using a pre-calculated decision
  */
 async function executeAccount(
     accountIndex: number,
     totalAccounts: number,
     dataFeed: PolygonLiveDataFeed,
-    isDryRun: boolean
+    isDryRun: boolean,
+    decision: StrategyDecision,
+    snapshot: MarketSnapshot
 ): Promise<{ success: boolean; accountName: string; error?: Error }> {
     const accounts = getConfiguredAccounts();
     const account = accounts[accountIndex];
@@ -73,12 +75,12 @@ async function executeAccount(
 
     try {
         // Create notifier for this account
-        const notifier = new SlackNotifier(account.name);
+        const notifier = new SlackNotifier(account.name, account.isPaper);
 
         // Create broker for this account
         const broker = createBroker(account);
 
-        // Get strategy parameters
+        // Get strategy parameters (not used directly here, but LiveRunner expects it)
         const params = createDefaultStrategyParams();
 
         // Create LiveRunner for this account
@@ -90,36 +92,27 @@ async function executeAccount(
             account
         );
 
-        // Execute the trading run
+        // Execute the trading run using the global decision
         if (isDryRun) {
-            await runner.dryRun();
+            await runner.dryRunDecision(decision, snapshot);
         } else {
-            await runner.runOnce();
+            await runner.executeDecision(decision, snapshot);
         }
 
         console.log(`${colors.green}✓ Account ${account.name} completed successfully${colors.reset}`);
-
         return { success: true, accountName: account.name };
 
     } catch (error) {
         console.error(`${colors.red}✗ Account ${account.name} FAILED${colors.reset}`);
         console.error(error);
-
-        return {
-            success: false,
-            accountName: account.name,
-            error: error instanceof Error ? error : new Error(String(error))
-        };
+        return { success: false, accountName: account.name, error: error instanceof Error ? error : new Error(String(error)) };
     }
 }
 
-/**
- * Main execution function
- */
 async function main() {
-    console.log(`\n${colors.bright}${colors.cyan}═══════════════════════════════════════════════════════════${colors.reset}`);
-    console.log(`${colors.bright}${colors.cyan}    ALPALO LIVE TRADING - MULTI-ACCOUNT ORCHESTRATOR${colors.reset}`);
-    console.log(`${colors.bright}${colors.cyan}═══════════════════════════════════════════════════════════${colors.reset}\n`);
+    console.log(`\n${colors.blue}═══════════════════════════════════════════════════════════${colors.reset}`);
+    console.log(`${colors.bright}    ALPALO LIVE TRADING - MULTI-ACCOUNT ORCHESTRATOR    ${colors.reset}`);
+    console.log(`${colors.blue}═══════════════════════════════════════════════════════════${colors.reset}\n`);
 
     // Parse command line arguments
     const args = process.argv.slice(2);
@@ -130,133 +123,124 @@ async function main() {
         console.log(`${colors.yellow}⚠️  DRY RUN MODE - No real orders will be placed${colors.reset}\n`);
     }
 
-    if (skipMarketCheck) {
+    // 1. Check Market Schedule (unless skipped)
+    if (!skipMarketCheck) {
+        // Initialize Alpaca client just for market status check (using first account)
+        const accounts = getConfiguredAccounts();
+        if (accounts.length === 0) {
+            console.error(`${colors.red}No accounts configured!${colors.reset}`);
+            process.exit(1);
+        }
+
+        const alpaca = new AlpacaClient(
+            accounts[0].key,
+            accounts[0].secret,
+            accounts[0].isPaper
+        );
+
+        console.log('Checking market schedule...');
+        const status = await getMarketStatus(alpaca);
+        const mocCheck = await isAppropriateForMOC(alpaca);
+
+        if (!mocCheck.appropriate) {
+            console.error(`${colors.red}❌ Market check failed: ${mocCheck.reason}${colors.reset}`);
+            console.log(`Market Open: ${status.isOpen}`);
+            console.log(`Time to Close: ${status.minutesToClose !== null ? formatMinutes(status.minutesToClose) : 'N/A'}`);
+            process.exit(1);
+        }
+
+        console.log(`${colors.green}✓ Market is open and within trading window (${formatMinutes(mocCheck.minutesToClose!)} to close)${colors.reset}\n`);
+    } else {
         console.log(`${colors.yellow}⚠️  SKIPPING MARKET SCHEDULE CHECK${colors.reset}\n`);
     }
 
-    // Get configured accounts
-    let accounts;
-    try {
-        accounts = getConfiguredAccounts();
-    } catch (error) {
-        console.error(`${colors.red}❌ Failed to load account configuration:${colors.reset}`, error);
-        process.exit(1);
-    }
-
+    // 2. Validate Configuration
+    const accounts = getConfiguredAccounts();
     if (accounts.length === 0) {
-        console.error(`${colors.red}❌ No accounts configured. Please set ACCOUNTS env var or legacy credentials.${colors.reset}`);
+        console.error(`${colors.red}No accounts configured in ACCOUNTS environment variable.${colors.reset}`);
         process.exit(1);
     }
 
-    console.log(`${colors.gray}📊 Configured Accounts: ${accounts.length}${colors.reset}`);
-    for (const account of accounts) {
-        console.log(`${colors.gray}   - ${account.name} (${account.isPaper ? 'PAPER' : 'LIVE'})${colors.reset}`);
-    }
-    console.log();
-
-    // Check market schedule (unless skipped)
-    if (!skipMarketCheck) {
-        console.log(`${colors.blue}🕐 Checking market schedule...${colors.reset}`);
-
-        try {
-            // Use first account to check market status (all accounts share the same market)
-            const testClient = new AlpacaClient(accounts[0].key, accounts[0].secret);
-            const marketStatus = await getMarketStatus(testClient);
-
-            console.log(`${colors.gray}   Market is: ${marketStatus.isOpen ? 'OPEN' : 'CLOSED'}${colors.reset}`);
-
-            if (!marketStatus.isOpen) {
-                console.error(`${colors.red}❌ Market is currently CLOSED${colors.reset}`);
-                console.log(`${colors.gray}   Next open: ${new Date(marketStatus.nextOpen).toLocaleString()}${colors.reset}`);
-                console.log(`${colors.yellow}\n💡 Tip: Use --skip-market-check to bypass this check for testing${colors.reset}\n`);
-                process.exit(1);
-            }
-
-            console.log(`${colors.green}✓ Market is open${colors.reset}`);
-
-            // Check if appropriate timing for MOC orders
-            const mocCheck = await isAppropriateForMOC(testClient, 30, 5);
-
-            if (mocCheck.minutesToClose !== undefined) {
-                const timeStr = formatMinutes(mocCheck.minutesToClose);
-                console.log(`${colors.gray}   Time to close: ${timeStr}${colors.reset}`);
-            }
-
-            if (!mocCheck.appropriate && mocCheck.reason) {
-                // This is a warning, not a hard stop
-                console.log(`${colors.yellow}⚠️  WARNING: ${mocCheck.reason}${colors.reset}`);
-                console.log(`${colors.yellow}   This strategy typically executes MOC (Market-On-Close) orders.${colors.reset}`);
-                console.log(`${colors.yellow}   Proceeding anyway, but timing may not be optimal.${colors.reset}`);
-            } else if (mocCheck.appropriate) {
-                console.log(`${colors.green}✓ Good timing for MOC orders${colors.reset}`);
-            }
-
-            console.log();
-
-        } catch (error) {
-            console.error(`${colors.red}❌ Failed to check market schedule:${colors.reset}`, error);
-            console.log(`${colors.yellow}💡 Tip: Use --skip-market-check to bypass this check${colors.reset}\n`);
-            process.exit(1);
-        }
+    // Warn about live accounts
+    const liveAccounts = accounts.filter(a => !a.isPaper);
+    if (liveAccounts.length > 0) {
+        console.log(`${colors.red}⚠️  Account "${liveAccounts[0].name}" is configured for LIVE TRADING with Alpaca. Ensure you have appropriate safety measures in place.${colors.reset}`);
     }
 
-    // Initialize shared PolygonLiveDataFeed
-    console.log(`${colors.blue}🔄 Initializing Polygon data feed...${colors.reset}`);
+    console.log(`📊 Configured Accounts: ${accounts.length}`);
+    accounts.forEach(a => console.log(`   - ${a.name} (${a.isPaper ? 'PAPER' : 'LIVE'})`));
+    console.log('');
+
+    // 3. Initialize Data Feed (Once)
+    console.log('🔄 Initializing Polygon data feed...');
     const dataFeed = new PolygonLiveDataFeed();
     console.log(`${colors.green}✓ Data feed initialized${colors.reset}\n`);
 
-    // Track execution results
-    const results: Array<{ success: boolean; accountName: string; error?: Error }> = [];
+    // 4. Fetch Market Data & Run Strategy (Once)
+    console.log('🔄 Fetching market data and generating strategy signal...');
 
-    // Execute for each account sequentially
-    // Sequential execution avoids rate limit issues and makes debugging easier
+    const executionDate = getNyDate();
+    const snapshot = await dataFeed.getSnapshotForDate(executionDate);
+
+    if (!snapshot) {
+        console.error(`${colors.red}❌ Failed to fetch market snapshot for ${executionDate}${colors.reset}`);
+        process.exit(1);
+    }
+
+    const params = createDefaultStrategyParams();
+    // Dummy portfolio for signal generation
+    const dummyPortfolio = { cash: 0, position: null, totalEquity: 0 };
+
+    // Import runStrategy dynamically or statically. Statically is fine since we are in tsx.
+    // But we need to import it. It is not imported at top level?
+    // Ah, I see `import { createDefaultStrategyParams } from '../strategy/engine';` at top.
+    // I need to add `runStrategy` to that import.
+    // Wait, I will add it to the import list in this file content.
+    const { runStrategy } = await import('../strategy/engine');
+
+    const decision = runStrategy(snapshot, dummyPortfolio, params);
+
+    console.log(`${colors.green}✓ Strategy signal generated: ${decision.action} ${decision.symbol} (${(decision.weight * 100).toFixed(1)}%)${colors.reset}`);
+    console.log(`${colors.gray}Reason: ${decision.reason}${colors.reset}\n`);
+
+    // 5. Execute for Each Account
+    const results = [];
     for (let i = 0; i < accounts.length; i++) {
-        const result = await executeAccount(i, accounts.length, dataFeed, isDryRun);
+        // Add a small delay between accounts to avoid rate limits
+        if (i > 0) await delay(2000);
+
+        const result = await executeAccount(i, accounts.length, dataFeed, isDryRun, decision, snapshot);
         results.push(result);
-
-        // Add delay between accounts to be nice to APIs (except for last account)
-        if (i < accounts.length - 1) {
-            const delayMs = 2000; // 2 seconds
-            console.log(`${colors.gray}\n⏱️  Waiting ${delayMs / 1000}s before next account...${colors.reset}`);
-            await delay(delayMs);
-        }
     }
 
-    // Print summary
-    console.log(`\n\n${colors.bright}${colors.cyan}═══════════════════════════════════════════════════════════${colors.reset}`);
-    console.log(`${colors.bright}${colors.cyan}                    EXECUTION SUMMARY${colors.reset}`);
-    console.log(`${colors.bright}${colors.cyan}═══════════════════════════════════════════════════════════${colors.reset}\n`);
+    // 6. Summary
+    console.log(`\n\n${colors.blue}═══════════════════════════════════════════════════════════${colors.reset}`);
+    console.log(`                    EXECUTION SUMMARY                    `);
+    console.log(`${colors.blue}═══════════════════════════════════════════════════════════${colors.reset}\n`);
 
-    const successCount = results.filter(r => r.success).length;
-    const failureCount = results.filter(r => !r.success).length;
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
 
-    console.log(`${colors.gray}Total Accounts: ${results.length}${colors.reset}`);
-    console.log(`${colors.green}✓ Successful: ${successCount}${colors.reset}`);
-    console.log(`${colors.red}✗ Failed: ${failureCount}${colors.reset}\n`);
-
-    // List failed accounts if any
-    if (failureCount > 0) {
-        console.log(`${colors.red}Failed Accounts:${colors.reset}`);
-        for (const result of results) {
-            if (!result.success) {
-                console.log(`${colors.red}  - ${result.accountName}: ${result.error?.message}${colors.reset}`);
-            }
-        }
-        console.log();
+    console.log(`Total Accounts: ${accounts.length}`);
+    console.log(`${colors.green}✓ Successful: ${successful}${colors.reset}`);
+    if (failed > 0) {
+        console.log(`${colors.red}✗ Failed: ${failed}${colors.reset}`);
+        results.filter(r => !r.success).forEach(r => {
+            console.log(`  - ${r.accountName}: ${r.error?.message}`);
+        });
     }
 
-    // Exit with appropriate code
-    if (failureCount > 0) {
-        console.log(`${colors.red}❌ Exiting with errors (${failureCount} account(s) failed)${colors.reset}\n`);
+    if (failed > 0) {
+        console.log(`\n${colors.red}❌ Some accounts failed to execute${colors.reset}`);
         process.exit(1);
     } else {
-        console.log(`${colors.green}✅ All accounts executed successfully${colors.reset}\n`);
+        console.log(`\n${colors.green}✅ All accounts executed successfully${colors.reset}`);
         process.exit(0);
     }
 }
 
-// Execute main function
+// Run main
 main().catch(error => {
-    console.error(`\n${colors.red}❌ Fatal error:${colors.reset}`, error);
+    console.error('Unhandled error:', error);
     process.exit(1);
 });

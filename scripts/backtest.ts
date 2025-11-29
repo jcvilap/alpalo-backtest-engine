@@ -11,7 +11,10 @@
  *   npm run backtest ALL          # Full history
  */
 
-import dotenv from 'dotenv';
+// Load environment variables BEFORE other imports (PolygonClient initializes Redis at module level)
+// Load environment variables BEFORE other imports (PolygonClient initializes Redis at module level)
+import 'dotenv/config'; // Loads .env file from project root
+
 import { OHLC } from '../src/lib/types';
 import { BacktestResult } from '../src/lib/backtest/backtestEngine';
 import { PolygonClient } from '../src/lib/polygon/client';
@@ -22,9 +25,6 @@ import { BacktestDataFeed } from '../src/backtest/BacktestDataFeed';
 import { BacktestBroker } from '../src/backtest/BacktestBroker';
 import { BacktestRunner } from '../src/backtest/BacktestRunner';
 import { createDefaultStrategyParams } from '../src/strategy/engine';
-
-// Load .env.local file
-dotenv.config({ path: '.env.local' });
 
 // ANSI color codes for terminal output
 const colors = {

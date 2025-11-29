@@ -2,6 +2,18 @@
 
 This guide provides step-by-step instructions for running and testing the Alpalo Backtest Engine. Follow each step precisely and verify the expected outcomes.
 
+This guide provides step-by-step instructions for running and testing the Alpalo Backtest Engine. Follow each step precisely and verify the expected outcomes.
+
+---
+
+## Date & Timezone Handling
+
+**IMPORTANT**: All trading operations and date calculations in this system are based on **New York Time (EST/EDT)**.
+
+- **Market Data**: Historical data is stored with dates corresponding to the trading day in NY.
+- **Live Trading**: The system automatically converts UTC server time to NY time to determine the correct "trading day".
+- **Testing**: When running `trade:dry-run` or other scripts late at night (e.g., after midnight UTC but before midnight EST), the system correctly identifies the previous calendar day as the current trading day if the market is still considered "active" or for reporting purposes.
+
 ---
 
 ## Step 1: Clone and Navigate to Repository
@@ -22,7 +34,7 @@ remote: Enumerating objects: ...
 ```bash
 ls -la
 ```
-You should see: `package.json`, `src/`, `cache/`, `README.md`, etc.
+You should see: `package.json`, `src/`, `README.md`, etc.
 
 ---
 
@@ -73,40 +85,45 @@ Should display: `POLYGON_API_KEY=pk_...` (your actual key)
 
 ---
 
-## Step 4: Prefetch Historical Data (One-time Setup)
-
-This step downloads 10 years of historical data for QQQ, TQQQ, and SQQQ from Polygon API.
-
-### Action
-```bash
-npx tsx scripts/prefetch.ts
-```
-
-### Expected Output
-```
-Prefetching historical data...
-Fetching QQQ from 2015-01-01...
-✓ Saved 2513 records to cache/QQQ.json
-Fetching TQQQ from 2015-01-01...
-✓ Saved 2513 records to cache/TQQQ.json
-Fetching SQQQ from 2015-01-01...
-✓ Saved 2513 records to cache/SQQQ.json
-Done!
-```
-
-### Verification
-```bash
-ls -lh cache/
-```
-Should show 3 JSON files:
-- `QQQ.json` (~500KB - 1MB)
-- `TQQQ.json` (~500KB - 1MB)
-- `SQQQ.json` (~500KB - 1MB)
-
-### Common Issues
-- **Error: "Forbidden"** → Your API key may be invalid or rate-limited
-- **Error: "ENOENT cache"** → Create the cache directory: `mkdir -p cache`
-- **Partial data** → Polygon free tier may have data limits; premium keys get full history
+## Step 4: Populate Redis Cache (One-time Setup)
+ 
+ This step downloads historical data for QQQ, TQQQ, and SQQQ from Polygon API and stores it in Redis.
+ 
+ ### Action
+ ```bash
+ pnpm populate-cache
+ ```
+ 
+ ### Expected Output
+ ```
+           Redis Cache Population Tool
+ ═══════════════════════════════════════════════════════
+ 
+ 🔍 Checking Redis cache status...
+ 
+ [REDIS] Connected successfully
+ 
+ 🔄 Populating cache for QQQ...
+    Fetching from Polygon (2020-11-26 to 2025-11-26)...
+    Found 1258 bars
+    Saving to Redis...
+ ✓ QQQ populated (1258 records)
+ 
+ ...
+ 
+ ✅ Cache population complete!
+ ```
+ 
+ ### Verification
+ ```bash
+ pnpm test-connections
+ ```
+ Should show "Redis Cache Status" with populated keys and sizes.
+ 
+ ### Common Issues
+ - **Error: "Forbidden"** → Your API key may be invalid or rate-limited
+ - **Error: "Redis not available"** → Ensure `REDIS_URL` is set correctly
+ - **Partial data** → Polygon free tier may have data limits
 
 ---
 
@@ -239,7 +256,7 @@ npm run backtest 10YR
 **Solution**: Ensure dependencies are installed: `npm install`
 
 #### Error: "No data available"
-**Solution**: Run prefetch script first: `npx tsx scripts/prefetch.ts`
+**Solution**: Run populate script first: `pnpm populate-cache`
 
 #### Error: "Forbidden"
 **Solution**: Check your `POLYGON_API_KEY` in `.env.local`
@@ -612,7 +629,7 @@ After completing all steps, you should have verified:
 - [x] Repository cloned successfully
 - [x] Dependencies installed
 - [x] Environment variables configured
-- [x] Historical data cached (3 JSON files)
+- [x] Historical data cached (in Redis)
 - [x] Dev server starts without errors
 
 ### Functionality
@@ -648,8 +665,8 @@ After completing all steps, you should have verified:
 ### Issue: "Cannot GET /api/backtest"
 **Solution**: Dev server not running. Start with `npm run dev`
 
-### Issue: Empty cache files
-**Solution**: Re-run `npx tsx scripts/prefetch.ts` with valid API key
+### Issue: Empty cache
+**Solution**: Re-run `pnpm populate-cache` with valid API key
 
 ### Issue: Chart shows flat line at 0%
 **Solution**: No trades executed. Check strategy logic or expand date range
@@ -872,7 +889,7 @@ Fetching snapshot for 2025-11-26...
 | **LIVE** | `POLYGON_API_KEY`<br>`ACCOUNTS` (with `isPaper: false`) | Real trading, real money |
 
 Optional for all modes:
-- `SLACK_WEBHOOK_URL` - For trade notifications
+- `SLACK_TOKEN` - For trade notifications (Slack Bot User OAuth Token)
 
 ---
 

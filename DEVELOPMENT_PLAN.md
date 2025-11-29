@@ -52,17 +52,19 @@ We need to send alerts for trade executions and errors, tagged by account.
 **Concept**:
 - `Notifier` interface: `notify(subject: string, message: string, level: NotificationLevel, metadata?: any): Promise<void>`
 - `SlackNotifier` implementation:
-  - Uses `src/config/secrets.ts` to get webhook URL.
-  - Formats messages nicely with color-coded attachments (Green for INFO, Orange for WARN, Red for ERROR).
-  - Prefixes messages with the Account name.
+  - Uses Slack Web API with `SLACK_TOKEN` environment variable.
+  - Routes messages to appropriate channels based on account type and severity:
+    - `#alpalo-paper-account` / `#alpalo-paper-account-error` for paper trading
+    - `#alpalo-live-account` / `#alpalo-live-account-error` for live trading
+  - Prefixes messages with timestamp and environment (PROD/LOCAL).
   - Falls back to console logging if Slack is not configured.
 
 **Implementation**:
 - ✅ Created `Notifier` interface with `NotificationLevel` enum (INFO, WARN, ERROR)
-- ✅ Implemented `SlackNotifier` with webhook support
-- ✅ Added color-coded Slack message formatting with attachments
+- ✅ Implemented `SlackNotifier` with Slack Web API support
+- ✅ Added channel routing based on account type (paper/live) and severity
 - ✅ Implemented console fallback for when Slack is not configured
-- ✅ Added account name prefixing for notifications
+- ✅ Added timestamp and environment prefixing for notifications
 - ✅ Included metadata field support for additional context
 
 ---
@@ -190,7 +192,7 @@ If time to close is > 20 mins, log a warning (since this strategy is typically M
 **Files**: `docs/DEPLOYMENT.md` (NEW)
 **Concept**:
 - Document the `cron` schedule (e.g., `45 15 * * 1-5` for 3:45 PM ET).
-- Document the required Env Vars (`POLYGON_API_KEY`, `TRADING_ACCOUNTS_CONFIG`, `SLACK_WEBHOOK_URL`).
+- Document the required Env Vars (`POLYGON_API_KEY`, `TRADING_ACCOUNTS_CONFIG`, `SLACK_TOKEN`).
 
 **LLM Prompt**:
 ```text

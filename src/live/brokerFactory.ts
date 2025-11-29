@@ -49,7 +49,7 @@ export function createBroker(config: AccountConfig): Broker {
  * @returns Configured AlpacaBroker instance
  */
 function createAlpacaBroker(config: AccountConfig): Broker {
-    const client = new AlpacaClient(config.key, config.secret);
+    const client = new AlpacaClient(config.key, config.secret, config.isPaper);
     return new AlpacaBroker(client);
 }
 

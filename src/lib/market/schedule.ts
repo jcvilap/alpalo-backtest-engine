@@ -157,3 +157,21 @@ export function formatMinutes(minutes: number): string {
     }
     return `${mins}m`;
 }
+
+/**
+ * Get current date in New York timezone (YYYY-MM-DD)
+ *
+ * This ensures consistent date handling across the application, preventing
+ * issues where UTC date is already "tomorrow" during late-night trading/testing.
+ *
+ * @param date - Optional date object (defaults to now)
+ * @returns Date string in YYYY-MM-DD format
+ */
+export function getNyDate(date: Date = new Date()): string {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(date);
+}

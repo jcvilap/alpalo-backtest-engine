@@ -26,7 +26,7 @@ export enum NotificationLevel {
  * Notifier interface for sending notifications
  *
  * Implementations:
- * - SlackNotifier: Sends notifications to Slack via webhook
+ * - SlackNotifier: Sends notifications to Slack via Web API
  * - ConsoleNotifier: Logs notifications to console
  * - EmailNotifier: Sends notifications via email (future)
  */

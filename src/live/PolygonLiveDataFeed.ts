@@ -21,7 +21,7 @@ import { formatNYDate, toNYDate } from '../lib/utils/dateUtils';
  * Number of historical days to fetch for indicator calculation
  * Must be at least 200 for MA200 calculation
  */
-const HISTORICAL_LOOKBACK_DAYS = 250;
+const HISTORICAL_LOOKBACK_DAYS = 400;
 
 /**
  * Live implementation of DataFeed using Polygon API

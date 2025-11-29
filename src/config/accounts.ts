@@ -145,9 +145,5 @@ function validateAccounts(accounts: AccountConfig[]): void {
             throw new Error(`Account ${account.name}: Robinhood does not support paper trading. Set isPaper to false or use Alpaca.`);
         }
 
-        // Safety warning for LIVE accounts
-        if (!account.isPaper) {
-            console.warn(`⚠️  Account "${account.name}" is configured for LIVE TRADING with ${account.broker}. Ensure you have appropriate safety measures in place.`);
-        }
     }
 }

@@ -20,14 +20,14 @@
  *   - ACCOUNTS: JSON array of account configurations (required)
  */
 
+// Load environment variables BEFORE other imports
 import dotenv from 'dotenv';
+dotenv.config(); // Loads .env file from project root
+
 import { getConfiguredAccounts, BrokerType, AccountConfig } from '../config/accounts';
 import { AlpacaClient } from '../live/alpacaClient';
 import { AlpacaBroker } from '../live/AlpacaBroker';
 import { RobinhoodBroker } from '../live/RobinhoodBroker';
-
-// Load environment variables
-dotenv.config({ path: '.env.local' });
 
 // ANSI color codes
 const colors = {
@@ -58,9 +58,9 @@ interface TestResult {
 /**
  * Test Alpaca broker connection
  */
-async function testAlpacaAccount(accountName: string, key: string, secret: string): Promise<Omit<TestResult, 'accountName' | 'broker' | 'isPaper'>> {
+async function testAlpacaAccount(accountName: string, key: string, secret: string, isPaper: boolean): Promise<Omit<TestResult, 'accountName' | 'broker' | 'isPaper'>> {
     try {
-        const client = new AlpacaClient(key, secret);
+        const client = new AlpacaClient(key, secret, isPaper);
         const broker = new AlpacaBroker(client);
 
         // Get account info
@@ -137,7 +137,7 @@ async function testAccount(account: AccountConfig): Promise<TestResult> {
 
     try {
         if (brokerType === BrokerType.ALPACA) {
-            const testResult = await testAlpacaAccount(account.name, account.key, account.secret);
+            const testResult = await testAlpacaAccount(account.name, account.key, account.secret, account.isPaper);
             Object.assign(result, testResult);
         } else if (brokerType === BrokerType.ROBINHOOD) {
             const testResult = await testRobinhoodAccount(account.name, account.key, account.secret);

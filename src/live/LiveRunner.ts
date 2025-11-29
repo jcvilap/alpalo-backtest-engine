@@ -12,10 +12,11 @@
 import { DataFeed } from '../ports/DataFeed';
 import { Broker, OrderResult } from '../ports/Broker';
 import { runStrategy } from '../strategy/engine';
-import { StrategyParams } from '../strategy/types';
+import { StrategyParams, StrategyDecision, MarketSnapshot } from '../strategy/types';
 import { PortfolioManager } from '../lib/trade/PortfolioManager';
 import { Notifier, NotificationLevel } from '../ports/Notifier';
 import { AccountConfig } from '../config/accounts';
+import { getNyDate } from '../lib/market/schedule';
 
 /**
  * Result of a single live trading execution
@@ -101,19 +102,14 @@ export class LiveRunner {
     }
 
     /**
-     * Execute the strategy once for the current date
+     * Execute a pre-calculated strategy decision
      *
-     * This method should be called:
-     * - Daily after market close (e.g., via cron job at 5 PM ET)
-     * - Or intraday for more frequent rebalancing
-     *
-     * Sends notifications on start, success, and error.
-     *
-     * @param date - Date to execute for (YYYY-MM-DD), defaults to today
-     * @returns Execution result with decision, orders, and portfolio state
+     * @param decision - The strategy decision to execute
+     * @param snapshot - Market snapshot used for the decision
+     * @returns Execution result
      */
-    async runOnce(date?: string): Promise<LiveExecutionResult> {
-        const executionDate = date || new Date().toISOString().split('T')[0];
+    async executeDecision(decision: StrategyDecision, snapshot: MarketSnapshot): Promise<LiveExecutionResult> {
+        const executionDate = snapshot.date;
         const prefix = this.getLogPrefix();
 
         // Send starting notification
@@ -131,14 +127,7 @@ export class LiveRunner {
         console.log(`${prefix} Executing strategy for ${executionDate}`);
 
         try {
-            // 1. Fetch current market snapshot
-            const snapshot = await this.dataFeed.getSnapshotForDate(executionDate);
-
-            if (!snapshot) {
-                throw new Error(`No market data available for ${executionDate}`);
-            }
-
-            // 2. Get current portfolio state from broker
+            // 1. Get current portfolio state from broker
             const portfolio = await this.broker.getPortfolioState();
 
             console.log(`${prefix} Current portfolio:`, {
@@ -147,12 +136,9 @@ export class LiveRunner {
                 totalEquity: portfolio.totalEquity
             });
 
-            // 3. Run strategy engine to get decision
-            const decision = runStrategy(snapshot, portfolio, this.params);
+            // console.log(`${prefix} Strategy decision:`, decision);
 
-            console.log(`${prefix} Strategy decision:`, decision);
-
-            // 4. Calculate required orders
+            // 2. Calculate required orders
             const orders = this.portfolioManager.calculateOrders(
                 decision,
                 portfolio.position,
@@ -162,7 +148,7 @@ export class LiveRunner {
 
             console.log(`${prefix} Orders to execute:`, orders);
 
-            // 5. Execute orders (if any)
+            // 3. Execute orders (if any)
             let orderResults: OrderResult[] = [];
             if (orders.length > 0) {
                 orderResults = await this.broker.placeOrders(orders);
@@ -178,10 +164,10 @@ export class LiveRunner {
                 console.log(`${prefix} No rebalancing needed`);
             }
 
-            // 6. Get updated portfolio state
+            // 4. Get updated portfolio state
             const updatedPortfolio = await this.broker.getPortfolioState();
 
-            // 7. Build result
+            // 5. Build result
             const result: LiveExecutionResult = {
                 timestamp: new Date().toISOString(),
                 decision: {
@@ -210,7 +196,7 @@ export class LiveRunner {
                 }
             };
 
-            // 8. Send success notification
+            // 6. Send success notification
             const successMessage = this.buildSuccessMessage(result);
             await this.notifier.notify(
                 `${this.accountConfig.name} - Trading Run Completed`,
@@ -254,56 +240,14 @@ export class LiveRunner {
     }
 
     /**
-     * Build a success notification message with decision and order details
-     */
-    private buildSuccessMessage(result: LiveExecutionResult): string {
-        const lines: string[] = [
-            `✅ Trading run completed successfully`,
-            ``,
-            `**Decision:**`,
-            `- Symbol: ${result.decision.symbol}`,
-            `- Action: ${result.decision.action}`,
-            `- Weight: ${(result.decision.weight * 100).toFixed(1)}%`,
-            `- Reason: ${result.decision.reason}`,
-            ``
-        ];
-
-        if (result.orders.length > 0) {
-            lines.push(`**Orders Placed: ${result.orders.length}**`);
-            for (const order of result.orders) {
-                lines.push(`- ${order.side} ${order.shares} ${order.symbol} - ${order.status}`);
-            }
-            lines.push(``);
-        } else {
-            lines.push(`**Orders:** None (no rebalancing needed)`);
-            lines.push(``);
-        }
-
-        lines.push(`**Portfolio:**`);
-        lines.push(`- Cash: $${result.portfolio.cash.toFixed(2)}`);
-        lines.push(`- Total Equity: $${result.portfolio.totalEquity.toFixed(2)}`);
-
-        if (result.portfolio.positions.length > 0) {
-            lines.push(`- Positions:`);
-            for (const pos of result.portfolio.positions) {
-                lines.push(`  - ${pos.symbol}: ${pos.shares} shares @ $${pos.currentPrice.toFixed(2)} = $${pos.marketValue.toFixed(2)}`);
-            }
-        }
-
-        return lines.join('\n');
-    }
-
-    /**
-     * Dry run - execute strategy without placing real orders
+     * Dry run a pre-calculated strategy decision
      *
-     * Useful for testing and validation before going live.
-     * Sends notifications similar to runOnce but marks orders as DRY_RUN.
-     *
-     * @param date - Date to simulate for
-     * @returns What would have been executed (without actual orders)
+     * @param decision - The strategy decision to execute
+     * @param snapshot - Market snapshot used for the decision
+     * @returns Execution result
      */
-    async dryRun(date?: string): Promise<LiveExecutionResult> {
-        const executionDate = date || new Date().toISOString().split('T')[0];
+    async dryRunDecision(decision: StrategyDecision, snapshot: MarketSnapshot): Promise<LiveExecutionResult> {
+        const executionDate = snapshot.date;
         const prefix = this.getLogPrefix();
 
         // Send starting notification
@@ -322,11 +266,6 @@ export class LiveRunner {
         console.log(`${prefix} Executing DRY RUN for ${executionDate}`);
 
         try {
-            const snapshot = await this.dataFeed.getSnapshotForDate(executionDate);
-            if (!snapshot) {
-                throw new Error(`No market data available for ${executionDate}`);
-            }
-
             const portfolio = await this.broker.getPortfolioState();
 
             console.log(`${prefix} Current portfolio:`, {
@@ -335,9 +274,7 @@ export class LiveRunner {
                 totalEquity: portfolio.totalEquity
             });
 
-            const decision = runStrategy(snapshot, portfolio, this.params);
-
-            console.log(`${prefix} Strategy decision:`, decision);
+            // console.log(`${prefix} Strategy decision:`, decision);
 
             const orders = this.portfolioManager.calculateOrders(
                 decision,
@@ -418,5 +355,73 @@ export class LiveRunner {
             // Re-throw to allow caller to handle
             throw error;
         }
+    }
+
+    /**
+     * Build a success notification message with decision and order details
+     */
+    private buildSuccessMessage(result: LiveExecutionResult): string {
+        const lines: string[] = [
+            `✅ Trading run completed successfully`,
+            ``,
+            `**Decision:**`,
+            `- Symbol: ${result.decision.symbol}`,
+            `- Action: ${result.decision.action}`,
+            `- Weight: ${(result.decision.weight * 100).toFixed(1)}%`,
+            `- Reason: ${result.decision.reason}`,
+            ``
+        ];
+
+        if (result.orders.length > 0) {
+            lines.push(`**Orders Placed: ${result.orders.length}**`);
+            for (const order of result.orders) {
+                lines.push(`- ${order.side} ${order.shares} ${order.symbol} - ${order.status}`);
+            }
+            lines.push(``);
+        } else {
+            lines.push(`**Orders:** None (no rebalancing needed)`);
+            lines.push(``);
+        }
+
+        lines.push(`**Portfolio:**`);
+        lines.push(`- Cash: $${result.portfolio.cash.toFixed(2)}`);
+        lines.push(`- Total Equity: $${result.portfolio.totalEquity.toFixed(2)}`);
+
+        if (result.portfolio.positions.length > 0) {
+            lines.push(`- Positions:`);
+            for (const pos of result.portfolio.positions) {
+                lines.push(`  - ${pos.symbol}: ${pos.shares} shares @ $${pos.currentPrice.toFixed(2)} = $${pos.marketValue.toFixed(2)}`);
+            }
+        }
+
+        return lines.join('\n');
+    }
+
+    /**
+     * Legacy method - kept for compatibility but delegates to executeDecision
+     */
+    async runOnce(date?: string): Promise<LiveExecutionResult> {
+        const executionDate = date || getNyDate();
+        const snapshot = await this.dataFeed.getSnapshotForDate(executionDate);
+        if (!snapshot) {
+            throw new Error(`No market data available for ${executionDate}`);
+        }
+        const portfolio = await this.broker.getPortfolioState();
+        const decision = runStrategy(snapshot, portfolio, this.params);
+        return this.executeDecision(decision, snapshot);
+    }
+
+    /**
+     * Legacy method - kept for compatibility but delegates to dryRunDecision
+     */
+    async dryRun(date?: string): Promise<LiveExecutionResult> {
+        const executionDate = date || getNyDate();
+        const snapshot = await this.dataFeed.getSnapshotForDate(executionDate);
+        if (!snapshot) {
+            throw new Error(`No market data available for ${executionDate}`);
+        }
+        const portfolio = await this.broker.getPortfolioState();
+        const decision = runStrategy(snapshot, portfolio, this.params);
+        return this.dryRunDecision(decision, snapshot);
     }
 }

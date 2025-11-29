@@ -65,7 +65,7 @@ Create `.env.local` in the project root:
 POLYGON_API_KEY=your_polygon_api_key_here
 
 # Slack Notifications (Optional)
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+SLACK_TOKEN=xoxb-your-slack-bot-token
 
 # Multi-Account Configuration (Required)
 ACCOUNTS='[
@@ -300,7 +300,11 @@ When configured, the system sends notifications for:
 - ✅ **Trading Run Completed**: Decision details, orders placed, portfolio state
 - ❌ **Trading Run Failed**: Error message and stack trace
 
-Configure the `SLACK_WEBHOOK_URL` in `.env.local` to enable.
+Configure the `SLACK_TOKEN` in `.env.local` to enable notifications. The notifier will automatically route messages to the appropriate channels:
+- `#alpalo-paper-account` - Paper trading notifications
+- `#alpalo-paper-account-error` - Paper trading errors
+- `#alpalo-live-account` - Live trading notifications
+- `#alpalo-live-account-error` - Live trading errors
 
 ### Log Files
 
