@@ -22,6 +22,7 @@ import { PortfolioManager } from '../lib/trade/PortfolioManager';
 import { BacktestResult, Trade } from '../lib/backtest/backtestEngine';
 import { toNYDate, getNYNow } from '../lib/utils/dateUtils';
 import { BacktestBroker } from './BacktestBroker';
+import { Strategy } from '../lib/types';
 
 /**
  * Backtest configuration
@@ -48,6 +49,7 @@ export class BacktestRunner {
     private broker: Broker;
     private params: StrategyParams;
     private portfolioManager: PortfolioManager;
+    private strategy?: Strategy;
 
     /**
      * Create a new BacktestRunner
@@ -55,11 +57,13 @@ export class BacktestRunner {
      * @param dataFeed - Data feed implementation
      * @param broker - Broker implementation
      * @param params - Strategy parameters
+     * @param strategy - Optional custom strategy (if not provided, uses default StrategyController)
      */
-    constructor(dataFeed: DataFeed, broker: Broker, params: StrategyParams) {
+    constructor(dataFeed: DataFeed, broker: Broker, params: StrategyParams, strategy?: Strategy) {
         this.dataFeed = dataFeed;
         this.broker = broker;
         this.params = params;
+        this.strategy = strategy;
         this.portfolioManager = new PortfolioManager();
     }
 
@@ -131,8 +135,10 @@ export class BacktestRunner {
             // Get portfolio state
             const portfolio = await this.broker.getPortfolioState();
 
-            // Run strategy engine
-            const decision = runStrategy(snapshot, portfolio, this.params);
+            // Run strategy engine - use custom strategy if provided, otherwise use default
+            const decision = this.strategy
+                ? this.strategy.analyze(snapshot.qqqHistory)
+                : runStrategy(snapshot, portfolio, this.params);
 
             // Calculate orders using PortfolioManager
             const currentPos = portfolio.position;
