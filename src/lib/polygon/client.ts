@@ -3,15 +3,27 @@ import fs from 'fs';
 import path from 'path';
 import { toNYDate, getNYNow, formatNYDate } from '../utils/dateUtils';
 import { addDays, subMonths } from 'date-fns';
-import { kv } from '@vercel/kv';
-
-import os from 'os';
+import { createClient, RedisClientType } from 'redis';
 
 const BASE_URL = 'https://api.polygon.io/v2/aggs/ticker';
-// Use /tmp in production (Vercel) or local cache dir in development
-const CACHE_DIR = process.env.NODE_ENV === 'production'
-    ? path.join(os.tmpdir(), 'alpalo-cache')
-    : path.join(process.cwd(), 'cache');
+
+// Initialize Redis client
+let redis: RedisClientType | null = null;
+
+if (process.env.REDIS_URL) {
+    redis = createClient({ url: process.env.REDIS_URL });
+
+    redis.on('connect', () => console.log('[REDIS] Connected successfully'));
+    redis.on('error', (err) => console.error('[REDIS] Connection error:', err.message));
+
+    // Connect to Redis
+    redis.connect().catch((err) => {
+        console.error('[REDIS] Failed to connect:', err.message);
+        redis = null;
+    });
+} else {
+    console.warn('[REDIS] No REDIS_URL found - caching disabled');
+}
 
 interface MarketStatusEvent {
     date: string;
@@ -32,46 +44,21 @@ export class PolygonClient {
     private calendarCache: Map<number, MarketCalendar> = new Map();
 
     constructor() {
-        try {
-            if (!fs.existsSync(CACHE_DIR)) {
-                fs.mkdirSync(CACHE_DIR, { recursive: true });
-            }
-
-            // In production, seed the ephemeral cache from the committed cache if available
-            if (process.env.NODE_ENV === 'production') {
-                const seedDir = path.join(process.cwd(), 'cache');
-                if (fs.existsSync(seedDir)) {
-                    const files = fs.readdirSync(seedDir);
-                    for (const file of files) {
-                        const srcPath = path.join(seedDir, file);
-                        const destPath = path.join(CACHE_DIR, file);
-                        if (!fs.existsSync(destPath)) {
-                            try {
-                                fs.copyFileSync(srcPath, destPath);
-                                console.log(`[CACHE SEED] Copied ${file} to ephemeral cache`);
-                            } catch (err) {
-                                console.warn(`[CACHE SEED] Failed to copy ${file}:`, err);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('Failed to create/seed cache directory, caching disabled:', e);
+        // Redis initialization happens at module level
+        if (!redis) {
+            console.warn('[POLYGON] Redis not configured - OHLC caching disabled');
         }
     }
 
-    private getCalendarFilePath(year: number): string {
-        return path.join(CACHE_DIR, `market-calendar-${year}.json`);
-    }
-
     private async loadCalendar(year: number): Promise<MarketCalendar | null> {
-        const filePath = this.getCalendarFilePath(year);
-        if (!fs.existsSync(filePath)) return null;
+        if (!redis) return null;
 
         try {
-            const raw = fs.readFileSync(filePath, 'utf-8');
-            const parsed = JSON.parse(raw) as MarketCalendar;
+            const key = `market-calendar-${year}`;
+            const cached = await redis.get(key);
+            if (!cached) return null;
+
+            const parsed = JSON.parse(cached) as MarketCalendar;
             parsed.holidays = new Set(parsed.holidaysArray ?? []);
             parsed.tradingDays = new Set(parsed.tradingDaysArray ?? []);
             return parsed;
@@ -81,15 +68,21 @@ export class PolygonClient {
         }
     }
 
-    private saveCalendar(calendar: MarketCalendar) {
-        const filePath = this.getCalendarFilePath(calendar.year);
-        const payload = {
-            year: calendar.year,
-            fetchedAt: calendar.fetchedAt,
-            holidaysArray: Array.from(calendar.holidays),
-            tradingDaysArray: Array.from(calendar.tradingDays)
-        };
-        fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
+    private async saveCalendar(calendar: MarketCalendar): Promise<void> {
+        if (!redis) return;
+
+        try {
+            const key = `market-calendar-${calendar.year}`;
+            const payload = {
+                year: calendar.year,
+                fetchedAt: calendar.fetchedAt,
+                holidaysArray: Array.from(calendar.holidays),
+                tradingDaysArray: Array.from(calendar.tradingDays)
+            };
+            await redis.set(key, JSON.stringify(payload));
+        } catch (error) {
+            console.error(`Failed to save calendar cache for ${calendar.year}:`, error);
+        }
     }
 
     private async fetchCalendarFromApi(year: number): Promise<MarketCalendar> {
@@ -197,37 +190,31 @@ export class PolygonClient {
         return minutes >= marketCloseMinutes - 10;
     }
 
-    private getCacheFilePath(ticker: string): string {
-        return path.join(CACHE_DIR, `${ticker}.json`);
-    }
-
     private async loadCache(ticker: string): Promise<OHLC[]> {
-        // Production: Use Vercel KV
-        if (process.env.NODE_ENV === 'production') {
-            try {
-                const data = await kv.get<OHLC[]>(ticker);
-                return data ?? [];
-            } catch (e) {
-                console.error(`Error reading KV cache for ${ticker}:`, e);
-                return [];
-            }
+        if (!redis) {
+            console.warn(`[CACHE] Redis not available, cannot load cache for ${ticker}`);
+            return [];
         }
 
-        // Development: Use file system
-        const filePath = this.getCacheFilePath(ticker);
-        if (fs.existsSync(filePath)) {
-            try {
-                const data = fs.readFileSync(filePath, 'utf-8');
-                return JSON.parse(data);
-            } catch (e) {
-                console.error(`Error reading cache for ${ticker}:`, e);
+        try {
+            const key = `ohlc:${ticker}`;
+            const cached = await redis.get(key);
+            if (!cached) {
                 return [];
             }
+            return JSON.parse(cached) as OHLC[];
+        } catch (e) {
+            console.error(`Error reading Redis cache for ${ticker}:`, e);
+            return [];
         }
-        return [];
     }
 
     private async saveCache(ticker: string, data: OHLC[], allowToday: boolean = true): Promise<void> {
+        if (!redis) {
+            console.warn(`[CACHE] Redis not available, cannot save cache for ${ticker}`);
+            return;
+        }
+
         const now = getNYNow();
         const todayStr = formatNYDate(now);
         const minutes = now.getHours() * 60 + now.getMinutes();
@@ -242,19 +229,13 @@ export class PolygonClient {
         const uniqueData = Array.from(new Map(dataToCache.map(item => [item.date, item])).values())
             .sort((a, b) => toNYDate(a.date).getTime() - toNYDate(b.date).getTime());
 
-        // Production: Use Vercel KV
-        if (process.env.NODE_ENV === 'production') {
-            try {
-                await kv.set(ticker, uniqueData);
-            } catch (e) {
-                console.error(`Error writing KV cache for ${ticker}:`, e);
-            }
-            return;
+        try {
+            const key = `ohlc:${ticker}`;
+            await redis.set(key, JSON.stringify(uniqueData));
+            console.log(`[CACHE] Saved ${uniqueData.length} records for ${ticker} to Redis`);
+        } catch (e) {
+            console.error(`Error writing Redis cache for ${ticker}:`, e);
         }
-
-        // Development: Use file system
-        const filePath = this.getCacheFilePath(ticker);
-        fs.writeFileSync(filePath, JSON.stringify(uniqueData, null, 2));
     }
 
     async fetchAggregates(ticker: string, from: string, to: string): Promise<OHLC[]> {
