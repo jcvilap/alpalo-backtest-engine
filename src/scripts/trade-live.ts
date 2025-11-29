@@ -160,7 +160,7 @@ async function main() {
 
         try {
             // Use first account to check market status (all accounts share the same market)
-            const testClient = new AlpacaClient(accounts[0].key, accounts[0].secret);
+            const testClient = new AlpacaClient(accounts[0].key, accounts[0].secret, accounts[0].isPaper);
             const marketStatus = await getMarketStatus(testClient);
 
             console.log(`${colors.gray}   Market is: ${marketStatus.isOpen ? 'OPEN' : 'CLOSED'}${colors.reset}`);

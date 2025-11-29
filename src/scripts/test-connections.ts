@@ -214,7 +214,7 @@ async function testAlpacaAccount(account: AccountConfig): Promise<BrokerTestResu
     };
 
     try {
-        const client = new AlpacaClient(account.key, account.secret);
+        const client = new AlpacaClient(account.key, account.secret, account.isPaper);
         const broker = new AlpacaBroker(client);
 
         // Get account info
