@@ -19,15 +19,15 @@
  *   - ACCOUNTS: JSON array of account configurations (optional)
  */
 
+// IMPORTANT: Load environment variables BEFORE any other imports
 import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
 import { createClient, RedisClientType } from 'redis';
 import { WebClient } from '@slack/web-api';
 import { getConfiguredAccounts, BrokerType, AccountConfig } from '../config/accounts';
 import { AlpacaClient } from '../live/alpacaClient';
 import { AlpacaBroker } from '../live/AlpacaBroker';
-
-// Load environment variables
-dotenv.config({ path: '.env.local' });
 
 // ANSI color codes
 const colors = {

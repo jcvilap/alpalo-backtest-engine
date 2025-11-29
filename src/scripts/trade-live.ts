@@ -22,7 +22,11 @@
  *   - 1: One or more accounts failed
  */
 
+// IMPORTANT: Load environment variables BEFORE any other imports
+// PolygonLiveDataFeed uses PolygonClient which initializes Redis at module level
 import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
 import { getConfiguredAccounts } from '../config/accounts';
 import { PolygonLiveDataFeed } from '../live/PolygonLiveDataFeed';
 import { createBroker } from '../live/brokerFactory';
@@ -31,9 +35,6 @@ import { LiveRunner } from '../live/LiveRunner';
 import { createDefaultStrategyParams } from '../strategy/engine';
 import { AlpacaClient } from '../live/alpacaClient';
 import { getMarketStatus, isAppropriateForMOC, formatMinutes } from '../lib/market/schedule';
-
-// Load environment variables
-dotenv.config({ path: '.env.local' });
 
 // ANSI color codes for terminal output
 const colors = {
