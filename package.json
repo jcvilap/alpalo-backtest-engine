@@ -27,7 +27,7 @@
     "backtest:20YR": "tsx scripts/backtest.ts 20YR",
     "backtest:ALL": "tsx scripts/backtest.ts ALL",
     "trade:live": "tsx src/scripts/trade-live.ts",
-    "trade:dry-run": "tsx src/scripts/trade-live.ts --dry-run",
+    "trade:dry-run": "tsx src/scripts/trade-live.ts --dry-run --skip-market-check",
     "test-connections": "tsx src/scripts/test-connections.ts",
     "populate-cache": "tsx src/scripts/populate-redis-cache.ts"
   },
