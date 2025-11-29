@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { toNYDate, getNYNow, formatNYDate } from '../utils/dateUtils';
 import { addDays, subMonths } from 'date-fns';
+import { kv } from '@vercel/kv';
 
 import os from 'os';
 
@@ -200,7 +201,19 @@ export class PolygonClient {
         return path.join(CACHE_DIR, `${ticker}.json`);
     }
 
-    private loadCache(ticker: string): OHLC[] {
+    private async loadCache(ticker: string): Promise<OHLC[]> {
+        // Production: Use Vercel KV
+        if (process.env.NODE_ENV === 'production') {
+            try {
+                const data = await kv.get<OHLC[]>(ticker);
+                return data ?? [];
+            } catch (e) {
+                console.error(`Error reading KV cache for ${ticker}:`, e);
+                return [];
+            }
+        }
+
+        // Development: Use file system
         const filePath = this.getCacheFilePath(ticker);
         if (fs.existsSync(filePath)) {
             try {
@@ -214,9 +227,7 @@ export class PolygonClient {
         return [];
     }
 
-    private saveCache(ticker: string, data: OHLC[], allowToday: boolean = true) {
-        const filePath = this.getCacheFilePath(ticker);
-
+    private async saveCache(ticker: string, data: OHLC[], allowToday: boolean = true): Promise<void> {
         const now = getNYNow();
         const todayStr = formatNYDate(now);
         const minutes = now.getHours() * 60 + now.getMinutes();
@@ -231,6 +242,18 @@ export class PolygonClient {
         const uniqueData = Array.from(new Map(dataToCache.map(item => [item.date, item])).values())
             .sort((a, b) => toNYDate(a.date).getTime() - toNYDate(b.date).getTime());
 
+        // Production: Use Vercel KV
+        if (process.env.NODE_ENV === 'production') {
+            try {
+                await kv.set(ticker, uniqueData);
+            } catch (e) {
+                console.error(`Error writing KV cache for ${ticker}:`, e);
+            }
+            return;
+        }
+
+        // Development: Use file system
+        const filePath = this.getCacheFilePath(ticker);
         fs.writeFileSync(filePath, JSON.stringify(uniqueData, null, 2));
     }
 
@@ -255,12 +278,12 @@ export class PolygonClient {
         }
 
         // 1. Load Cache
-        let cachedData = this.loadCache(ticker);
+        let cachedData = await this.loadCache(ticker);
 
         if (cachedData.length === 0) {
             console.log(`[CACHE EMPTY] ${ticker}: Fetching fresh data`);
             const fresh = await this.fetchFromApi(ticker, formatNYDate(reqStart), formatNYDate(reqEnd));
-            this.saveCache(ticker, fresh, allowTodayFetch);
+            await this.saveCache(ticker, fresh, allowTodayFetch);
             return fresh;
         }
 
@@ -314,7 +337,7 @@ export class PolygonClient {
                 );
 
                 cachedData = await this.populateMissingTradingDays(combined, reqEnd, cEnd);
-                this.saveCache(ticker, cachedData, allowTodayFetch);
+                await this.saveCache(ticker, cachedData, allowTodayFetch);
             } catch (error) {
                 console.warn(`Failed to fetch additional data for ${ticker}:`, error instanceof Error ? error.message : error);
             }
