@@ -50,6 +50,12 @@ interface ServiceTestResult {
     duration: number;
 }
 
+interface CacheEntry {
+    key: string;
+    exists: boolean;
+    size?: number;
+}
+
 interface BrokerTestResult extends ServiceTestResult {
     service: 'broker';
     accountName: string;
@@ -239,6 +245,59 @@ async function testAlpacaAccount(account: AccountConfig): Promise<BrokerTestResu
 }
 
 /**
+ * Check Redis cache status
+ */
+async function checkRedisCache(): Promise<CacheEntry[] | null> {
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+        return null;
+    }
+
+    try {
+        const redis = createClient({ url: redisUrl });
+        await redis.connect();
+
+        const tickers = ['TQQQ', 'QQQ', 'SQQQ'];
+        const year = new Date().getFullYear();
+        const keysToCheck = [
+            ...tickers.map(t => `ohlc:${t}`),
+            `market-calendar-${year}`
+        ];
+
+        const results: CacheEntry[] = [];
+
+        for (const key of keysToCheck) {
+            try {
+                const exists = await redis.exists(key);
+                if (exists) {
+                    const data = await redis.get(key);
+                    results.push({
+                        key,
+                        exists: true,
+                        size: data ? Buffer.byteLength(data, 'utf8') : 0
+                    });
+                } else {
+                    results.push({
+                        key,
+                        exists: false
+                    });
+                }
+            } catch (error) {
+                results.push({
+                    key,
+                    exists: false
+                });
+            }
+        }
+
+        await redis.quit();
+        return results;
+    } catch (error) {
+        return null;
+    }
+}
+
+/**
  * Test all broker accounts
  */
 async function testBrokers(): Promise<BrokerTestResult[]> {
@@ -287,9 +346,49 @@ async function testBrokers(): Promise<BrokerTestResult[]> {
 }
 
 /**
+ * Format bytes to human-readable size
+ */
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Print cache summary
+ */
+function printCacheStatus(cacheEntries: CacheEntry[] | null) {
+    if (!cacheEntries) {
+        return;
+    }
+
+    console.log(`\n${colors.bright}Redis Cache Status:${colors.reset}`);
+    console.log(`${colors.gray}${'─'.repeat(80)}${colors.reset}`);
+
+    let hasCache = false;
+    let totalSize = 0;
+
+    for (const entry of cacheEntries) {
+        if (entry.exists && entry.size) {
+            hasCache = true;
+            totalSize += entry.size;
+            console.log(`${colors.green}✓${colors.reset} ${colors.bright}${entry.key.padEnd(30)}${colors.reset} ${colors.gray}${formatBytes(entry.size)}${colors.reset}`);
+        } else {
+            console.log(`${colors.yellow}○${colors.reset} ${colors.gray}${entry.key.padEnd(30)} Not cached${colors.reset}`);
+        }
+    }
+
+    if (hasCache) {
+        console.log(`${colors.gray}\n   Total cache size: ${formatBytes(totalSize)}${colors.reset}`);
+    } else {
+        console.log(`${colors.yellow}\n   💡 Run 'pnpm populate-cache' to populate Redis with market data${colors.reset}`);
+    }
+}
+
+/**
  * Print detailed results
  */
-function printResults(results: TestResult[]) {
+function printResults(results: TestResult[], cacheEntries: CacheEntry[] | null) {
     console.log(`\n${colors.bright}${colors.cyan}═══════════════════════════════════════════════════════════${colors.reset}`);
     console.log(`${colors.bright}${colors.cyan}              CONNECTION TEST RESULTS${colors.reset}`);
     console.log(`${colors.bright}${colors.cyan}═══════════════════════════════════════════════════════════${colors.reset}\n`);
@@ -363,6 +462,9 @@ function printResults(results: TestResult[]) {
         }
     }
 
+    // Print cache status if Redis is configured
+    printCacheStatus(cacheEntries);
+
     console.log(`\n${colors.gray}${'─'.repeat(80)}${colors.reset}\n`);
 
     // Summary stats
@@ -405,11 +507,12 @@ async function main() {
     console.log(`${colors.gray}Running tests in parallel...${colors.reset}\n`);
 
     // Run all tests in parallel
-    const [polygonResult, redisResult, slackResult, brokerResults] = await Promise.all([
+    const [polygonResult, redisResult, slackResult, brokerResults, cacheStatus] = await Promise.all([
         testPolygon(),
         testRedis(),
         testSlack(),
-        testBrokers()
+        testBrokers(),
+        checkRedisCache()
     ]);
 
     // Combine all results
@@ -421,7 +524,7 @@ async function main() {
     ];
 
     // Print results
-    const exitCode = printResults(allResults);
+    const exitCode = printResults(allResults, cacheStatus);
 
     process.exit(exitCode);
 }
