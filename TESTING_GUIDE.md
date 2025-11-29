@@ -872,7 +872,7 @@ Fetching snapshot for 2025-11-26...
 | **LIVE** | `POLYGON_API_KEY`<br>`ACCOUNTS` (with `isPaper: false`) | Real trading, real money |
 
 Optional for all modes:
-- `SLACK_WEBHOOK_URL` - For trade notifications
+- `SLACK_TOKEN` - For trade notifications (Slack Bot User OAuth Token)
 
 ---
 

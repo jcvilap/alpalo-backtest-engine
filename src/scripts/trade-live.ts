@@ -15,7 +15,7 @@
  * Environment Variables Required:
  *   - POLYGON_API_KEY: Polygon API key for market data
  *   - ACCOUNTS: JSON array of account configurations (or legacy env vars)
- *   - SLACK_WEBHOOK_URL: Optional Slack webhook for notifications
+ *   - SLACK_TOKEN: Optional Slack API token for notifications
  *
  * Exit Codes:
  *   - 0: All accounts executed successfully
@@ -73,7 +73,7 @@ async function executeAccount(
 
     try {
         // Create notifier for this account
-        const notifier = new SlackNotifier(account.name);
+        const notifier = new SlackNotifier(account.name, account.isPaper);
 
         // Create broker for this account
         const broker = createBroker(account);

@@ -60,7 +60,7 @@ POLYGON_API_KEY=your_polygon_api_key_here
 ACCOUNTS='[{"name":"My Paper Account","key":"YOUR_PAPER_KEY","secret":"YOUR_PAPER_SECRET","isPaper":true,"broker":"Alpaca"}]'
 
 # Slack Notifications (optional)
-SLACK_WEBHOOK_URL=your_slack_webhook_url
+SLACK_TOKEN=your_slack_bot_token
 EOF
 
 # Prefetch historical data (run once)
