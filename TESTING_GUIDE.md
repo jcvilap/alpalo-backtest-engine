@@ -2,6 +2,18 @@
 
 This guide provides step-by-step instructions for running and testing the Alpalo Backtest Engine. Follow each step precisely and verify the expected outcomes.
 
+This guide provides step-by-step instructions for running and testing the Alpalo Backtest Engine. Follow each step precisely and verify the expected outcomes.
+
+---
+
+## Date & Timezone Handling
+
+**IMPORTANT**: All trading operations and date calculations in this system are based on **New York Time (EST/EDT)**.
+
+- **Market Data**: Historical data is stored with dates corresponding to the trading day in NY.
+- **Live Trading**: The system automatically converts UTC server time to NY time to determine the correct "trading day".
+- **Testing**: When running `trade:dry-run` or other scripts late at night (e.g., after midnight UTC but before midnight EST), the system correctly identifies the previous calendar day as the current trading day if the market is still considered "active" or for reporting purposes.
+
 ---
 
 ## Step 1: Clone and Navigate to Repository

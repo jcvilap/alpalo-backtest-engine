@@ -16,6 +16,7 @@ import { StrategyParams } from '../strategy/types';
 import { PortfolioManager } from '../lib/trade/PortfolioManager';
 import { Notifier, NotificationLevel } from '../ports/Notifier';
 import { AccountConfig } from '../config/accounts';
+import { getNyDate } from '../lib/market/schedule';
 
 /**
  * Result of a single live trading execution
@@ -113,12 +114,7 @@ export class LiveRunner {
      * @returns Execution result with decision, orders, and portfolio state
      */
     async runOnce(date?: string): Promise<LiveExecutionResult> {
-        const executionDate = date || new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'America/New_York',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-        }).format(new Date());
+        const executionDate = date || getNyDate();
         const prefix = this.getLogPrefix();
 
         // Send starting notification
@@ -308,12 +304,7 @@ export class LiveRunner {
      * @returns What would have been executed (without actual orders)
      */
     async dryRun(date?: string): Promise<LiveExecutionResult> {
-        const executionDate = date || new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'America/New_York',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-        }).format(new Date());
+        const executionDate = date || getNyDate();
         const prefix = this.getLogPrefix();
 
         // Send starting notification
