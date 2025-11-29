@@ -6,8 +6,12 @@
  * It fetches OHLC data for configured tickers and market calendar data.
  */
 
+import dotenv from 'dotenv';
 import { createClient } from 'redis';
 import { PolygonClient } from '../lib/polygon/client';
+
+// Load environment variables
+dotenv.config({ path: '.env.local' });
 
 // ANSI color codes
 const colors = {
