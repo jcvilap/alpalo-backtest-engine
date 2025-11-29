@@ -244,6 +244,13 @@ async function testAlpacaAccount(account: AccountConfig): Promise<BrokerTestResu
     return result;
 }
 
+interface CacheEntry {
+    key: string;
+    exists: boolean;
+    size?: number;
+    details?: string;
+}
+
 /**
  * Check Redis cache status
  */
@@ -257,29 +264,49 @@ async function checkRedisCache(): Promise<CacheEntry[] | null> {
         const redis = createClient({ url: redisUrl });
         await redis.connect();
 
-        const tickers = ['TQQQ', 'QQQ', 'SQQQ'];
-        const year = new Date().getFullYear();
-        const keysToCheck = [
-            ...tickers.map(t => `ohlc:${t}`),
-            `market-calendar-${year}`
-        ];
+        // Get all keys matching our patterns
+        const keys = await redis.keys('*');
+        const relevantKeys = keys.filter(k => k.startsWith('ohlc:') || k.startsWith('market-calendar-')).sort();
 
         const results: CacheEntry[] = [];
 
-        for (const key of keysToCheck) {
+        for (const key of relevantKeys) {
             try {
-                const exists = await redis.exists(key);
-                if (exists) {
-                    const data = await redis.get(key);
+                const type = await redis.type(key);
+                if (type === 'string') {
+                    const value = await redis.get(key);
+                    const size = value ? Buffer.byteLength(value, 'utf8') : 0;
+                    let details = '';
+
+                    if (key.startsWith('ohlc:')) {
+                        try {
+                            const data = JSON.parse(value || '[]');
+                            if (Array.isArray(data) && data.length > 0) {
+                                const start = data[0].date;
+                                const end = data[data.length - 1].date;
+                                details = `${data.length} records (${start} to ${end})`;
+                            } else {
+                                details = 'Empty';
+                            }
+                        } catch {
+                            details = 'Invalid JSON';
+                        }
+                    } else if (key.startsWith('market-calendar-')) {
+                        try {
+                            const data = JSON.parse(value || '{}');
+                            const tradingDays = data.tradingDaysArray?.length || 0;
+                            const holidays = data.holidaysArray?.length || 0;
+                            details = `${tradingDays} trading days, ${holidays} holidays`;
+                        } catch {
+                            details = 'Invalid JSON';
+                        }
+                    }
+
                     results.push({
                         key,
                         exists: true,
-                        size: data ? Buffer.byteLength(data, 'utf8') : 0
-                    });
-                } else {
-                    results.push({
-                        key,
-                        exists: false
+                        size,
+                        details
                     });
                 }
             } catch (error) {
@@ -372,7 +399,7 @@ function printCacheStatus(cacheEntries: CacheEntry[] | null) {
         if (entry.exists && entry.size) {
             hasCache = true;
             totalSize += entry.size;
-            console.log(`${colors.green}✓${colors.reset} ${colors.bright}${entry.key.padEnd(30)}${colors.reset} ${colors.gray}${formatBytes(entry.size)}${colors.reset}`);
+            console.log(`${colors.green}✓${colors.reset} ${colors.bright}${entry.key.padEnd(30)}${colors.reset} ${colors.gray}${formatBytes(entry.size).padEnd(10)}${colors.reset} ${entry.details || ''}`);
         } else {
             console.log(`${colors.yellow}○${colors.reset} ${colors.gray}${entry.key.padEnd(30)} Not cached${colors.reset}`);
         }
