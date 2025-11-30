@@ -73,9 +73,11 @@ The Alpalo V2 strategy is a **systematic, mechanical trading system** that trade
 
 ### Historical Backtest Results
 
-Testing command:
+Testing command (using default "current" strategy):
 ```bash
-POLYGON_API_KEY=xxx pnpm run backtest 1YR,5YR,15YR,20YR
+pnpm run backtest --timeframes=1YR,5YR,15YR,20YR
+# or using the CLI shorthand:
+pnpm run backtest --timeframes=1YR,5YR,15YR,20YR --strategies=current
 ```
 
 ### Detailed Metrics
@@ -132,7 +134,7 @@ POLYGON_API_KEY=xxx pnpm run backtest 1YR,5YR,15YR,20YR
 ### System Components
 
 ```
-StrategyController
+StrategyController ("current" strategy)
 ├── TrendFollowingStrategy (base regime)
 │   ├── Calculates MA50, MA200, ROC20
 │   ├── Classifies market regime
@@ -145,6 +147,8 @@ StrategyController
 
 Final Signal → PortfolioManager → BacktestEngine
 ```
+
+**Note**: The StrategyController is registered as "current" in the CLI, representing the default ensemble strategy.
 
 ### Signal Flow
 
@@ -494,14 +498,17 @@ constructor() {
 ### Testing Changes
 
 ```bash
-# Single timeframe
-pnpm run backtest 5YR
+# Single timeframe (uses default "current" strategy)
+pnpm run backtest --timeframes=5YR
 
 # Multiple timeframes
-pnpm run backtest 1YR,5YR,15YR,20YR
+pnpm run backtest --timeframes=1YR,5YR,15YR,20YR
 
 # Custom date range
-pnpm run backtest 2020-01-01:2024-12-31
+pnpm run backtest --timeframes=2020-01-01:2024-12-31
+
+# Compare different strategies
+pnpm run backtest --timeframes=2011-01-01:2011-12-31 --strategies=current,proposed-volatility-protected
 ```
 
 ---

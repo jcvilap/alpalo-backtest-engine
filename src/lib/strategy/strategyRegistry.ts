@@ -11,25 +11,25 @@ import { StrategyController } from './strategyController';
  *
  * ## Available Strategies
  *
- * 1. **controller** (default): Ensemble strategy combining trend-following + mean reversion
- * 2. **trend-following**: Simple MA250 crossover strategy
- * 3. **volatility-protected**: Enhanced strategy with ADX/RSI/ATR filters (best for 2011)
+ * 1. **current** (default): Ensemble strategy combining trend-following + mean reversion
+ * 2. **trend-following**: Simple MA250 crossover strategy (original baseline)
+ * 3. **proposed-volatility-protected**: Enhanced strategy with ADX/RSI/ATR filters (best for 2011)
  *
  * @example
  * ```typescript
  * // Get a specific strategy
- * const strategy = StrategyRegistry.get('volatility-protected');
+ * const strategy = StrategyRegistry.get('proposed-volatility-protected');
  *
  * // List all available strategies
  * const all = StrategyRegistry.listAll();
- * console.log(all); // ['controller', 'trend-following', 'volatility-protected']
+ * console.log(all); // ['current', 'trend-following', 'proposed-volatility-protected']
  * ```
  */
 export class StrategyRegistry {
     private static strategies: Map<string, () => Strategy> = new Map([
-        ['controller', () => new StrategyController()],
+        ['current', () => new StrategyController()],
         ['trend-following', () => new TrendFollowingStrategy()],
-        ['volatility-protected', () => new VolatilityProtectedStrategy()],
+        ['proposed-volatility-protected', () => new VolatilityProtectedStrategy()],
     ]);
 
     /**
@@ -85,9 +85,9 @@ export class StrategyRegistry {
      */
     static getDescription(name: string): string {
         const descriptions: Record<string, string> = {
-            'controller': 'Ensemble strategy combining trend-following (MA250) with mean reversion overlays',
+            'current': 'Ensemble strategy combining trend-following (MA250) with mean reversion overlays',
             'trend-following': 'Simple MA250 crossover strategy - original baseline implementation',
-            'volatility-protected': 'Enhanced trend-following with volatility protection (ADX/RSI/ATR filters) - optimized for 2011',
+            'proposed-volatility-protected': 'Enhanced trend-following with volatility protection (ADX/RSI/ATR filters) - optimized for 2011',
         };
 
         return descriptions[name] || 'No description available';

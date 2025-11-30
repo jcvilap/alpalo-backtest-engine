@@ -88,7 +88,8 @@ import { CONTROLLER } from './config';
  * // Returns combined signal from all sub-strategies
  * ```
  */
-export class StrategyController {
+export class StrategyController implements Strategy {
+    name = 'StrategyController';
     private strategies: Strategy[] = [];
 
     constructor() {

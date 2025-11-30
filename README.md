@@ -74,6 +74,32 @@ Open [http://localhost:3003](http://localhost:3003) to view the application.
 
 ## Usage
 
+### CLI Backtest Tool
+
+Run backtests from the command line for quick strategy testing and comparison:
+
+```bash
+# Run backtest with default strategy on all predefined timeframes
+pnpm run backtest
+
+# Single timeframe
+pnpm run backtest --timeframes=1YR
+
+# Multiple timeframes
+pnpm run backtest --timeframes=1YR,3YR,5YR
+
+# Custom date range
+pnpm run backtest --timeframes=2011-01-01:2011-12-31
+
+# Compare multiple strategies
+pnpm run backtest --timeframes=2011-01-01:2011-12-31 --strategies=current,proposed-volatility-protected
+```
+
+**Available Strategies:**
+- `current` (default): Ensemble strategy combining trend-following + mean reversion
+- `trend-following`: Simple MA250 crossover strategy (original baseline)
+- `proposed-volatility-protected`: Enhanced strategy with ADX/RSI/ATR filters
+
 ### Backtesting Mode (Default)
 
 1. **Select Date Range**: Choose start and end dates for your backtest period (data available from 2015-2025)

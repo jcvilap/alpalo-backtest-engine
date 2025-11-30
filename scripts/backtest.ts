@@ -5,17 +5,19 @@
  * Run backtests from the command line without opening the browser
  *
  * Usage:
- *   npm run backtest              # Full 10-year backtest with default strategy
- *   npm run backtest 1YR          # Last 1 year
- *   npm run backtest 3M,1YR,YTD   # Compare multiple ranges
- *   npm run backtest ALL          # Full history
- *   npm run backtest 2011-01-01:2011-12-31 --strategies volatility-protected,trend-following
- *                                 # Compare strategies on a custom date range
+ *   pnpm run backtest                                    # All timeframes with current (default) strategy
+ *   pnpm run backtest --timeframes=1YR                   # Last 1 year with current strategy
+ *   pnpm run backtest --timeframes=3M,1YR,YTD            # Multiple timeframes with current strategy
+ *   pnpm run backtest --timeframes=2011-01-01:2011-12-31 # Custom date range with current strategy
+ *   pnpm run backtest --timeframes=2011-01-01:2011-12-31 --strategies=current,proposed-volatility-protected
+ *                                                        # Compare strategies on 2011 data
+ *   pnpm run backtest --timeframes=1YR,3YR,5YR --strategies=current,proposed-volatility-protected
+ *                                                        # Compare strategies on multiple timeframes
  *
  * Available strategies:
- *   controller           - Ensemble strategy (trend-following + mean reversion)
- *   trend-following      - Simple MA250 crossover
- *   volatility-protected - Enhanced strategy with ADX/RSI/ATR filters
+ *   current                       - Ensemble strategy (trend-following + mean reversion) [DEFAULT]
+ *   trend-following               - Simple MA250 crossover (original baseline)
+ *   proposed-volatility-protected - Enhanced strategy with ADX/RSI/ATR filters
  */
 
 // Load environment variables BEFORE other imports (PolygonClient initializes Redis at module level)
@@ -92,33 +94,32 @@ async function main() {
     let capital: number = 1_000_000;
     let ranges: string[] = [];
     let strategyNames: string[] = [];
+    let strategiesExplicitlySet = false;
 
-    // Parse arguments
-    for (let i = 0; i < args.length; i++) {
-        const arg = args[i];
-        if (arg === '--capital') {
-            if (i + 1 < args.length) {
-                capital = Number(args[i + 1]);
-                i++;
-            }
-        } else if (arg === '--strategies') {
-            if (i + 1 < args.length) {
-                strategyNames = args[i + 1].split(',').map(s => s.trim());
-                i++;
-            }
-        } else if (!arg.startsWith('--')) {
-            // Handle comma-separated list
-            if (arg.includes(',')) {
-                ranges = arg.split(',').map(r => r.trim());
-            } else {
-                ranges.push(arg);
-            }
+    // Parse arguments (only --flag=value notation supported)
+    for (const arg of args) {
+        if (arg.startsWith('--capital=')) {
+            capital = Number(arg.split('=')[1]);
+        } else if (arg.startsWith('--timeframes=')) {
+            const value = arg.split('=')[1];
+            ranges = value.split(',').map(r => r.trim());
+        } else if (arg.startsWith('--strategies=')) {
+            const value = arg.split('=')[1];
+            strategyNames = value.split(',').map(s => s.trim());
+            strategiesExplicitlySet = true;
+        } else if (arg.startsWith('--')) {
+            console.warn(`Unknown flag: ${arg}`);
         }
     }
 
+    // Default to all predefined timeframes if none specified
     if (ranges.length === 0) {
-        // Default to running all predefined timeframes
         ranges = [...DATE_RANGE_OPTIONS];
+    }
+
+    // Default to 'current' strategy if none specified
+    if (strategyNames.length === 0) {
+        strategyNames = ['current'];
     }
 
     // 1. Determine Fetch Range (widest possible)
@@ -169,11 +170,11 @@ async function main() {
 
         console.log(`${colors.green}✓ Loaded ${qqqData.length} trading days${colors.reset}\n`);
 
-        // Strategy Comparison Mode
-        if (strategyNames.length > 0) {
+        // Strategy Comparison Mode (when strategies explicitly specified)
+        if (strategiesExplicitlySet) {
             console.log(`${colors.gray}⚡ Running strategy comparison...${colors.reset}`);
             console.log(`${colors.gray}   Strategies: ${strategyNames.join(', ')}${colors.reset}`);
-            console.log(`${colors.gray}   Ranges: ${ranges.length === 0 ? 'default' : ranges.join(', ')}${colors.reset}\n`);
+            console.log(`${colors.gray}   Timeframes: ${ranges.join(', ')}${colors.reset}\n`);
 
             // Use first range config (or default if empty)
             const config = rangeConfigs[0];
@@ -206,7 +207,7 @@ async function main() {
 
             // Print each strategy
             for (const { strategy, result } of strategyResults) {
-                const totalReturn = ((result.finalEquity - capital) / capital) * 100;
+                const totalReturn = result.metrics.totalReturn;
                 const returnStr = totalReturn >= 0
                     ? `${colors.green}+${totalReturn.toFixed(2)}%${colors.reset}`
                     : `${colors.red}${totalReturn.toFixed(2)}%${colors.reset}`;
@@ -214,17 +215,17 @@ async function main() {
                 console.log(
                     `${strategy.padEnd(25)} ` +
                     `${returnStr.padEnd(22)} ` +
-                    `${result.metrics.CAGR?.toFixed(2) || 'N/A'}% `.padEnd(20) +
+                    `${result.metrics.cagr?.toFixed(2) || 'N/A'}% `.padEnd(20) +
                     `${result.metrics.maxDrawdown?.toFixed(2) || 'N/A'}% `.padEnd(20) +
-                    `${result.metrics.totalTrades || 0}`
+                    `${result.trades.length || 0}`
                 );
             }
 
             // Print benchmarks
             if (strategyResults.length > 0) {
                 const firstResult = strategyResults[0].result;
-                const qqqReturn = firstResult.benchmarkMetrics.totalReturn || 0;
-                const tqqqReturn = firstResult.benchmarkMetrics.benchmarkTQQQReturn || 0;
+                const qqqReturn = firstResult.metrics.benchmark.totalReturn || 0;
+                const tqqqReturn = firstResult.metrics.benchmarkTQQQ.totalReturn || 0;
 
                 console.log('─'.repeat(80));
                 console.log(`${'QQQ (benchmark)'.padEnd(25)} ${qqqReturn >= 0 ? colors.green : colors.red}+${qqqReturn.toFixed(2)}%${colors.reset}`);
@@ -233,23 +234,28 @@ async function main() {
 
             console.log();
         }
-        // Regular mode
-        else if (ranges.length === 1) {
-            // Single Mode
-            const config = rangeConfigs[0];
-            console.log(`${colors.gray}⚡ Running backtest for ${config.label}...${colors.reset}`);
-            const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end);
-            printBacktestResult(result, config.start, config.end, capital, { mode: 'cli' });
-        } else {
-            // Multi Mode
-            console.log(`${colors.gray}⚡ Running backtests for: ${ranges.join(', ')}...${colors.reset}`);
+        // Regular mode (default strategy, no comparison)
+        else {
+            // Get the default strategy
+            const strategy = StrategyRegistry.get(strategyNames[0]);
 
-            const results = await Promise.all(rangeConfigs.map(async (config) => {
-                const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end);
-                return { range: config.label, result };
-            }));
+            if (ranges.length === 1) {
+                // Single timeframe mode
+                const config = rangeConfigs[0];
+                console.log(`${colors.gray}⚡ Running backtest for ${config.label} with ${strategyNames[0]} strategy...${colors.reset}`);
+                const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end, strategy);
+                printBacktestResult(result, config.start, config.end, capital, { mode: 'cli' });
+            } else {
+                // Multi timeframe mode
+                console.log(`${colors.gray}⚡ Running backtests for: ${ranges.join(', ')} with ${strategyNames[0]} strategy...${colors.reset}`);
 
-            printComparisonTable(results, { mode: 'cli' });
+                const results = await Promise.all(rangeConfigs.map(async (config) => {
+                    const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end, strategy);
+                    return { range: config.label, result };
+                }));
+
+                printComparisonTable(results, { mode: 'cli' });
+            }
         }
 
     } catch (error) {

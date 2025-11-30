@@ -38,8 +38,8 @@ export class Indicators {
         }
 
         const rsi: number[] = [];
-        let gains: number[] = [];
-        let losses: number[] = [];
+        const gains: number[] = [];
+        const losses: number[] = [];
 
         // Calculate initial average gain and loss
         for (let i = 1; i <= period; i++) {
@@ -117,6 +117,38 @@ export class Indicators {
      * Calculate Average Directional Index (ADX)
      * Quantifies trend strength (0-100, higher = stronger trend)
      */
+    /**
+     * Rolling Standard Deviation
+     * Calculates standard deviation over a rolling window
+     */
+    static rollingStdDev(data: OHLC[], period: number): number[] {
+        if (data.length < period) {
+            return [];
+        }
+
+        const stdDev: number[] = [];
+        for (let i = period - 1; i < data.length; i++) {
+            const window = data.slice(i - period + 1, i + 1);
+            const closes = window.map(d => d.close);
+            const mean = closes.reduce((a, b) => a + b, 0) / period;
+            const variance = closes.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / period;
+            stdDev.push(Math.sqrt(variance));
+        }
+
+        return stdDev;
+    }
+
+    /**
+     * Calculate Z-Score
+     * Measures how many standard deviations a value is from the mean
+     */
+    static calculateZScore(value: number, mean: number, stdDev: number): number {
+        if (stdDev === 0) {
+            return 0;
+        }
+        return (value - mean) / stdDev;
+    }
+
     static adx(data: OHLC[], period: number = 14): number[] {
         if (data.length < period * 2 + 1) {
             return [];
