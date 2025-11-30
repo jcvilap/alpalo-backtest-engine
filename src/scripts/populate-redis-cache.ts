@@ -198,14 +198,16 @@ async function main() {
             console.log();
 
             if (allPopulated) {
-                console.log(`${colors.green}✅ Cache successfully populated (Redis + FS)!${colors.reset}\n`);
+                console.log(`${colors.green}✅ Successfully populated both Redis and File System caches!${colors.reset}`);
+                console.log(`${colors.gray}   Both caches are now synchronized and ready for offline use.${colors.reset}\n`);
                 process.exit(0);
             } else {
                 console.log(`${colors.red}❌ Some cache entries failed to populate${colors.reset}\n`);
                 process.exit(1);
             }
         } else {
-            console.log(`${colors.green}✅ Cache is already fully populated!${colors.reset}\n`);
+            console.log(`${colors.green}✅ Redis and File System caches are already fully populated and synchronized!${colors.reset}`);
+            console.log(`${colors.gray}   System is ready for both online and offline operation.${colors.reset}\n`);
             process.exit(0);
         }
     } catch (error) {
