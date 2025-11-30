@@ -197,23 +197,60 @@ async function main() {
 
         // If we have multiple results (either multiple strategies or multiple ranges), print comparison table
         if (allResults.length > 0 && (ranges.length > 1 || strategies.length > 1)) {
-            // Group by strategy for cleaner output if we have multiple strategies
-            if (strategies.length > 1) {
-                console.log(`\n${colors.bright}📊 Strategy Comparison${colors.reset}`);
-                // We need to adapt printComparisonTable or create a new one for multi-strategy
-                // For now, let's print a table per strategy or a combined one if possible
-                // The existing printComparisonTable takes { range, result }[]
+            console.log(`\n${colors.bright}📊 Strategy Comparison${colors.reset}`);
 
-                // Let's print one table per strategy
+            // Collect all unique ranges
+            const uniqueRanges = Array.from(new Set(allResults.map(r => r.range)));
+
+            // Header
+            const header = [
+                'Range'.padEnd(10),
+                ...strategies.map(s => s.padEnd(25)),
+                'QQQ'.padEnd(12),
+                'TQQQ'.padEnd(12)
+            ].join('  ');
+
+            console.log(`${colors.gray}──────────────────────────────────────────────────────────────────────────────────────────${colors.reset}`);
+            console.log(header);
+            console.log(`${colors.gray}──────────────────────────────────────────────────────────────────────────────────────────${colors.reset}`);
+
+            for (const range of uniqueRanges) {
+                const rowParts: string[] = [range.padEnd(10)];
+
+                // Strategy columns
                 for (const strategy of strategies) {
-                    console.log(`\n${colors.cyan}Results for ${strategy}:${colors.reset}`);
-                    const strategyResults = allResults.filter(r => r.strategy === strategy);
-                    printComparisonTable(strategyResults, { mode: 'cli' });
+                    const result = allResults.find(r => r.range === range && r.strategy === strategy)?.result;
+                    if (result) {
+                        const totalReturn = result.metrics.totalReturn.toFixed(2) + '%';
+                        const cagr = result.metrics.cagr.toFixed(2) + '%';
+                        const cell = `${totalReturn} (${cagr} CAGR)`;
+
+                        // Color based on return
+                        const color = result.metrics.totalReturn >= 0 ? colors.green : colors.red;
+                        rowParts.push(`${color}${cell.padEnd(25)}${colors.reset}`);
+                    } else {
+                        rowParts.push('-'.padEnd(25));
+                    }
                 }
-            } else {
-                // Single strategy, multiple ranges - use standard table
-                printComparisonTable(allResults, { mode: 'cli' });
+
+                // Benchmark columns (using the first available result for this range)
+                const anyResult = allResults.find(r => r.range === range)?.result;
+                if (anyResult) {
+                    const qqqReturn = anyResult.metrics.benchmark.totalReturn.toFixed(2) + '%';
+                    const qqqColor = anyResult.metrics.benchmark.totalReturn >= 0 ? colors.green : colors.red;
+                    rowParts.push(`${qqqColor}${qqqReturn.padEnd(12)}${colors.reset}`);
+
+                    const tqqqReturn = anyResult.metrics.benchmarkTQQQ.totalReturn.toFixed(2) + '%';
+                    const tqqqColor = anyResult.metrics.benchmarkTQQQ.totalReturn >= 0 ? colors.green : colors.red;
+                    rowParts.push(`${tqqqColor}${tqqqReturn.padEnd(12)}${colors.reset}`);
+                } else {
+                    rowParts.push('-'.padEnd(12));
+                    rowParts.push('-'.padEnd(12));
+                }
+
+                console.log(rowParts.join('  '));
             }
+            console.log(`${colors.gray}──────────────────────────────────────────────────────────────────────────────────────────${colors.reset}`);
         }
 
     } catch (error) {

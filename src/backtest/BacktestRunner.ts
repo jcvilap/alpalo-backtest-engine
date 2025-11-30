@@ -92,13 +92,7 @@ export class BacktestRunner {
         const qqqData = await this.dataFeed.getHistoricalData('QQQ', firstDate, lastDate);
         const tqqqData = await this.dataFeed.getHistoricalData('TQQQ', firstDate, lastDate);
 
-        console.log('[BACKTEST RUNNER] Setup:', {
-            initialCapital: config.initialCapital,
-            qqqDataLength: qqqData.length,
-            dateRange: { first: firstDate, last: lastDate },
-            displayFrom: config.displayFrom,
-            warmupPeriod: this.params.maPeriods.long
-        });
+
 
         // Setup benchmark tracking
         const initialBenchmarkPrice = qqqData[0]?.close || 1;

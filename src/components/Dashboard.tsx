@@ -438,31 +438,31 @@ function DashboardContent() {
                                     {loading ? 'Running...' : 'Run Backtest'}
                                 </button>
                             </div>
-                        </div>
-
-                        {/* Strategy Selector */}
-                        <div className="mt-4 pt-4 border-t border-border transition-theme">
-                            <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">Strategy</label>
-                            <div className="relative">
-                                <select
-                                    value={strategy}
-                                    onChange={(e) => {
-                                        const newStrategy = e.target.value;
-                                        setStrategy(newStrategy);
-                                        updateUrl(undefined, undefined, undefined, undefined, newStrategy);
-                                    }}
-                                    className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary appearance-none"
-                                >
-                                    <option value="current">Current Strategy</option>
-                                    <option value="proposed-volatility-protected">Proposed Strategy (Volatility Protected)</option>
-                                </select>
-                                <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none">
-                                    <svg className="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                    </svg>
+                            <div className="md:col-span-5 mt-4 pt-4 border-t border-border transition-theme flex items-center gap-4">
+                                <label className="text-sm font-semibold text-text-secondary transition-theme whitespace-nowrap">Strategy:</label>
+                                <div className="relative flex-1 max-w-md">
+                                    <select
+                                        value={strategy}
+                                        onChange={(e) => {
+                                            const newStrategy = e.target.value;
+                                            setStrategy(newStrategy);
+                                            updateUrl(undefined, undefined, undefined, undefined, newStrategy);
+                                        }}
+                                        className="w-full px-4 py-2 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary appearance-none"
+                                    >
+                                        <option value="current">Current Strategy</option>
+                                        <option value="proposed-volatility-protected">Proposed Strategy (Volatility Protected)</option>
+                                    </select>
+                                    <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none">
+                                        <svg className="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
+
 
                         {error && (
                             <div className="mt-4 p-4 bg-danger-bg border border-danger rounded-xl flex items-start gap-3 transition-theme">
