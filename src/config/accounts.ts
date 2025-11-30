@@ -2,7 +2,7 @@
  * Multi-Account Configuration
  *
  * This module handles the configuration for multiple broker accounts.
- * Supports Alpaca (paper and live) and Robinhood (live only).
+ * Supports Alpaca (paper and live).
  * Accounts are configured via the ACCOUNTS environment variable (JSON array).
  */
 
@@ -10,8 +10,7 @@
  * Supported broker types
  */
 export enum BrokerType {
-    ALPACA = 'Alpaca',
-    ROBINHOOD = 'Robinhood'
+    ALPACA = 'Alpaca'
 }
 
 /**
@@ -134,15 +133,8 @@ function validateAccounts(accounts: AccountConfig[]): void {
         const brokerUpper = account.broker.toString().toUpperCase();
         if (brokerUpper === 'ALPACA') {
             account.broker = BrokerType.ALPACA;
-        } else if (brokerUpper === 'ROBINHOOD') {
-            account.broker = BrokerType.ROBINHOOD;
         } else {
-            throw new Error(`Account ${account.name}: Unsupported broker "${account.broker}". Supported: Alpaca, Robinhood`);
-        }
-
-        // Validate broker-specific constraints
-        if (account.broker === BrokerType.ROBINHOOD && account.isPaper) {
-            throw new Error(`Account ${account.name}: Robinhood does not support paper trading. Set isPaper to false or use Alpaca.`);
+            throw new Error(`Account ${account.name}: Unsupported broker "${account.broker}". Supported: Alpaca`);
         }
 
     }

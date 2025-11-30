@@ -309,7 +309,7 @@ async function checkRedisCache(): Promise<CacheEntry[] | null> {
                         details
                     });
                 }
-            } catch (error) {
+            } catch (_error) {
                 results.push({
                     key,
                     exists: false
@@ -319,7 +319,7 @@ async function checkRedisCache(): Promise<CacheEntry[] | null> {
 
         await redis.quit();
         return results;
-    } catch (error) {
+    } catch (_error) {
         return null;
     }
 }

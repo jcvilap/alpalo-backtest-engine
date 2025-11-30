@@ -10,7 +10,7 @@ import { Broker } from '../ports/Broker';
 import { AccountConfig, BrokerType } from '../config/accounts';
 import { AlpacaClient } from './alpacaClient';
 import { AlpacaBroker } from './AlpacaBroker';
-import { RobinhoodBroker } from './RobinhoodBroker';
+
 
 /**
  * Create a broker instance for a specific account
@@ -34,11 +34,8 @@ export function createBroker(config: AccountConfig): Broker {
         case BrokerType.ALPACA:
             return createAlpacaBroker(config);
 
-        case BrokerType.ROBINHOOD:
-            return createRobinhoodBroker(config);
-
         default:
-            throw new Error(`Unsupported broker type: ${brokerType}`);
+            throw new Error(`Unsupported broker type: ${config.broker}`);
     }
 }
 
@@ -53,18 +50,7 @@ function createAlpacaBroker(config: AccountConfig): Broker {
     return new AlpacaBroker(client);
 }
 
-/**
- * Create a Robinhood broker instance
- *
- * IMPORTANT: This creates a placeholder RobinhoodBroker that will throw an error
- * when used. Implement the Robinhood API client to enable actual trading.
- *
- * @param config - Account configuration with Robinhood credentials
- * @returns Configured RobinhoodBroker instance (placeholder)
- */
-function createRobinhoodBroker(config: AccountConfig): Broker {
-    return new RobinhoodBroker(config.key, config.secret);
-}
+
 
 /**
  * Create a broker instance with direct credential injection

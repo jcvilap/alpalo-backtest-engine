@@ -29,8 +29,20 @@ function DashboardContent() {
     const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'monthly' | 'cli'>('overview');
     const [cliLines, setCliLines] = useState<CliLine[]>([]);
     const [selectedRange, setSelectedRange] = useState<string | null>(null);
+    const [strategy, setStrategy] = useState<string>('current');
     const [isInitialized, setIsInitialized] = useState(false);
+    const [availableStrategies, setAvailableStrategies] = useState<{ id: string; name: string }[]>([]);
     const resultCache = useRef<Record<string, BacktestResult>>({});
+
+    // Fetch available strategies
+    useEffect(() => {
+        fetch('/api/strategies')
+            .then(res => res.json())
+            .then(data => {
+                setAvailableStrategies(data);
+            })
+            .catch(err => console.error('Failed to fetch strategies:', err));
+    }, []);
 
     // Auto-populate dates from cache
     useEffect(() => {
@@ -125,6 +137,12 @@ function DashboardContent() {
 
         const rangeParam = searchParams.get('range');
         const tabParam = searchParams.get('tab');
+        const strategyParam = searchParams.get('strategy');
+
+        // Handle Strategy Param
+        if (strategyParam && strategyParam !== strategy) {
+            setStrategy(strategyParam);
+        }
 
         // Handle Range Param
         if (rangeParam) {
@@ -175,10 +193,10 @@ function DashboardContent() {
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isInitialized, searchParams, endDate, loading, pathname, result, router, selectedRange, startDate]);
+    }, [isInitialized, searchParams, endDate, loading, pathname, result, router, selectedRange, startDate, strategy]);
 
     // Update URL when state changes
-    const updateUrl = (range?: string | null, tab?: string, customStart?: string, customEnd?: string) => {
+    const updateUrl = (range?: string | null, tab?: string, customStart?: string, customEnd?: string, newStrategy?: string) => {
         const params = new URLSearchParams(searchParams.toString());
 
         if (customStart && customEnd) {
@@ -195,6 +213,13 @@ function DashboardContent() {
             params.set('tab', tab);
         }
 
+        if (newStrategy) {
+            params.set('strategy', newStrategy);
+        } else if (strategy && !params.has('strategy')) {
+            // Ensure current strategy is preserved if not explicitly changed
+            params.set('strategy', strategy);
+        }
+
         // Update URL
         router.push(pathname + '?' + params.toString(), { scroll: false });
     };
@@ -208,7 +233,7 @@ function DashboardContent() {
             return;
         }
 
-        const cacheKey = `${start}:${end}`;
+        const cacheKey = `${start}:${end}:${strategy}`;
         const cachedResult = resultCache.current[cacheKey];
 
         if (cachedResult) {
@@ -235,7 +260,8 @@ function DashboardContent() {
                 body: JSON.stringify({
                     from: fetchStartStr,
                     to: end,
-                    displayFrom: start
+                    displayFrom: start,
+                    strategy: strategy
                 })
             });
 
@@ -295,6 +321,19 @@ function DashboardContent() {
 
                         {/* Inputs Row - Full Width on Mobile */}
                         <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                            <select
+                                value={strategy}
+                                onChange={(e) => {
+                                    const newStrategy = e.target.value;
+                                    setStrategy(newStrategy);
+                                    updateUrl(undefined, undefined, undefined, undefined, newStrategy);
+                                }}
+                                className="flex-1 sm:flex-none min-w-0 px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary sm:min-w-[120px]"
+                            >
+                                {availableStrategies.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
                             <input
                                 type="date"
                                 value={startDate}
@@ -349,66 +388,80 @@ function DashboardContent() {
                             </div>
                             <ThemeToggle />
                         </div>
-                        <p className="text-text-secondary text-lg transition-theme">Leveraged ETF Momentum Strategy</p>
-                        <div className="relative group inline-block mt-2">
-                            <div className="text-xs text-text-tertiary cursor-help flex items-center gap-1 transition-theme">
-                                {/* Omitted for brevity - Strategy info tooltip */}
-                            </div>
-                        </div>
+
                     </div>
                 )}
 
                 {/* Input Panel - hidden when results are loaded */}
                 {!result && (
                     <div className="bg-surface rounded-2xl shadow-lg border border-border-light p-6 mb-8 transition-theme">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                            <div className="md:col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                            {/* Strategy Selector */}
+                            <div className="md:col-span-3">
+                                <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">Strategy</label>
+                                <div className="relative">
+                                    <select
+                                        value={strategy}
+                                        onChange={(e) => {
+                                            const newStrategy = e.target.value;
+                                            setStrategy(newStrategy);
+                                            updateUrl(undefined, undefined, undefined, undefined, newStrategy);
+                                        }}
+                                        className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary appearance-none"
+                                    >
+                                        {availableStrategies.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none">
+                                        <svg className="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Start Date */}
+                            <div className="md:col-span-3">
                                 <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">Start Date</label>
-                                <div className="relative">
-                                    <input
-                                        type="date"
-                                        value={startDate}
-                                        min={minDate}
-                                        onChange={(e) => {
-                                            const newStart = e.target.value;
-                                            setStartDate(newStart);
-                                            setSelectedRange(null);
-                                            // Update URL with custom date range if both dates are set
-                                            if (newStart && endDate) {
-                                                updateUrl(undefined, undefined, newStart, endDate);
-                                            }
-                                        }}
-                                        className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary"
-                                    />
-                                </div>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    min={minDate}
+                                    max={endDate}
+                                    onChange={(e) => {
+                                        setStartDate(e.target.value);
+                                        updateUrl(undefined, undefined, e.target.value, undefined);
+                                    }}
+                                    className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary"
+                                />
                             </div>
-                            <div className="md:col-span-2">
+
+                            {/* End Date */}
+                            <div className="md:col-span-3">
                                 <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">End Date</label>
-                                <div className="relative">
-                                    <input
-                                        type="date"
-                                        value={endDate}
-                                        onChange={(e) => {
-                                            const newEnd = e.target.value;
-                                            setEndDate(newEnd);
-                                            setSelectedRange(null);
-                                            // Update URL with custom date range if both dates are set
-                                            if (startDate && newEnd) {
-                                                updateUrl(undefined, undefined, startDate, newEnd);
-                                            }
-                                        }}
-                                        className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary"
-                                    />
-                                </div>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    min={startDate}
+                                    max={formatNYDate(getNYNow())}
+                                    onChange={(e) => {
+                                        setEndDate(e.target.value);
+                                        updateUrl(undefined, undefined, undefined, e.target.value);
+                                    }}
+                                    className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary"
+                                />
                             </div>
-                            <div>
+
+                            {/* Run Button */}
+                            <div className="md:col-span-2">
                                 <button
                                     onClick={() => runBacktest()}
                                     disabled={loading}
                                     className={'w-full py-3 rounded-xl font-semibold transition-theme flex items-center justify-center gap-2 shadow-lg hover:shadow-xl ' + (loading ? 'bg-gray-300 cursor-not-allowed text-gray-600' : 'bg-primary hover:bg-primary-hover text-white')}
                                 >
                                     <Play className="w-5 h-5" />
-                                    {loading ? 'Running...' : 'Run Backtest'}
+                                    {loading ? 'Running...' : 'Run'}
                                 </button>
                             </div>
                         </div>
@@ -456,75 +509,77 @@ function DashboardContent() {
 
 
                 {/* Results */}
-                {result && (
-                    <div className="relative min-h-[400px]">
+                {
+                    result && (
+                        <div className="relative min-h-[400px]">
 
-                        <div className="space-y-8">
-                            {/* Tabs */}
-                            <div className="flex gap-2 border-b border-border mt-6 transition-theme overflow-x-auto scrollbar-hide">
-                                <button
-                                    onClick={() => handleTabChange('overview')}
-                                    className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
-                                >
-                                    <BarChart2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    Overview
-                                </button>
-                                <button
-                                    onClick={() => handleTabChange('trades')}
-                                    className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'trades' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
-                                >
-                                    <List className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    Trades
-                                </button>
-                                <button
-                                    onClick={() => handleTabChange('monthly')}
-                                    className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'monthly' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
-                                >
-                                    <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    Monthly
-                                </button>
-                                {selectedRange && cliLines.length > 0 && (
+                            <div className="space-y-8">
+                                {/* Tabs */}
+                                <div className="flex gap-2 border-b border-border mt-6 transition-theme overflow-x-auto scrollbar-hide">
                                     <button
-                                        onClick={() => handleTabChange('cli')}
-                                        className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'cli' ? 'border-success text-success' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                        onClick={() => handleTabChange('overview')}
+                                        className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
                                     >
-                                        <Terminal className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                        <span className="hidden sm:inline">CLI Output</span>
-                                        <span className="sm:hidden">CLI</span>
+                                        <BarChart2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                        Overview
                                     </button>
-                                )}
-                            </div>
+                                    <button
+                                        onClick={() => handleTabChange('trades')}
+                                        className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'trades' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                    >
+                                        <List className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                        Trades
+                                    </button>
+                                    <button
+                                        onClick={() => handleTabChange('monthly')}
+                                        className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'monthly' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                    >
+                                        <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                        Monthly
+                                    </button>
+                                    {selectedRange && cliLines.length > 0 && (
+                                        <button
+                                            onClick={() => handleTabChange('cli')}
+                                            className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'cli' ? 'border-success text-success' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                        >
+                                            <Terminal className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                            <span className="hidden sm:inline">CLI Output</span>
+                                            <span className="sm:hidden">CLI</span>
+                                        </button>
+                                    )}
+                                </div>
 
-                            {/* Tab Content */}
-                            <div>
-                                {/* OVERVIEW TAB */}
-                                {activeTab === 'overview' && (
-                                    <div className="space-y-8">
-                                        <PerformanceWidgets metrics={result.metrics} />
-                                        <EquityChart equityCurve={result.equityCurve} />
-                                    </div>
-                                )}
+                                {/* Tab Content */}
+                                <div>
+                                    {/* OVERVIEW TAB */}
+                                    {activeTab === 'overview' && (
+                                        <div className="space-y-8">
+                                            <PerformanceWidgets metrics={result.metrics} />
+                                            <EquityChart equityCurve={result.equityCurve} />
+                                        </div>
+                                    )}
 
-                                {/* TRADES TAB */}
-                                {activeTab === 'trades' && (
-                                    <TradeLogTable trades={result.trades} />
-                                )}
+                                    {/* TRADES TAB */}
+                                    {activeTab === 'trades' && (
+                                        <TradeLogTable trades={result.trades} />
+                                    )}
 
-                                {/* MONTHLY PERFORMANCE TAB */}
-                                {activeTab === 'monthly' && (
-                                    <MonthlyPerformanceMatrix equityCurve={result.equityCurve} />
-                                )}
+                                    {/* MONTHLY PERFORMANCE TAB */}
+                                    {activeTab === 'monthly' && (
+                                        <MonthlyPerformanceMatrix equityCurve={result.equityCurve} />
+                                    )}
 
-                                {/* CLI OUTPUT TAB */}
-                                {activeTab === 'cli' && (
-                                    <CliOutput lines={cliLines} />
-                                )}
+                                    {/* CLI OUTPUT TAB */}
+                                    {activeTab === 'cli' && (
+                                        <CliOutput lines={cliLines} />
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
-        </div>
+                    )
+                }
+            </div >
+        </div >
     );
 }
 

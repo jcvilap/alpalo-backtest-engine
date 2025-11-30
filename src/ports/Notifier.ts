@@ -1,48 +1,20 @@
 /**
  * Notifier Port Interface
  *
- * Abstracts notification delivery. Implementations can send notifications
- * to different channels (Slack, email, console, etc.).
- *
- * This interface follows the "Ports and Adapters" pattern, allowing the system
- * to send notifications without coupling to specific delivery mechanisms.
+ * Abstracts the notification system to allow sending alerts and logs
+ * to external services (like Slack) or logging to console.
  */
 
-/**
- * Notification severity level
- */
-export enum NotificationLevel {
-    /** Informational messages (e.g., trade executed successfully) */
-    INFO = 'INFO',
+export type NotificationLevel = 'INFO' | 'WARN' | 'ERROR';
 
-    /** Warning messages (e.g., market closed, unusual conditions) */
-    WARN = 'WARN',
-
-    /** Error messages (e.g., order failed, API error) */
-    ERROR = 'ERROR'
-}
-
-/**
- * Notifier interface for sending notifications
- *
- * Implementations:
- * - SlackNotifier: Sends notifications to Slack via Web API
- * - ConsoleNotifier: Logs notifications to console
- * - EmailNotifier: Sends notifications via email (future)
- */
 export interface Notifier {
     /**
      * Send a notification
      *
-     * @param subject - Brief subject/title of the notification
-     * @param message - Detailed message body (supports markdown)
+     * @param subject - Brief subject or title of the notification
+     * @param message - Detailed message body
      * @param level - Severity level (INFO, WARN, ERROR)
-     * @param metadata - Optional metadata to include (e.g., account info, trade details)
+     * @param metadata - Optional additional data to attach
      */
-    notify(
-        subject: string,
-        message: string,
-        level: NotificationLevel,
-        metadata?: Record<string, unknown>
-    ): Promise<void>;
+    notify(subject: string, message: string, level: NotificationLevel, metadata?: Record<string, unknown>): Promise<void>;
 }

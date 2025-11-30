@@ -14,6 +14,7 @@
  */
 
 import { StrategyController } from '../lib/strategy/strategyController';
+export type { MarketSnapshot, PortfolioState, StrategyParams, StrategyDecision } from './types';
 import { MarketSnapshot, PortfolioState, StrategyParams, StrategyDecision } from './types';
 import {
     MA_PERIODS,

@@ -1,6 +1,6 @@
 import { OHLC } from '../types';
 import { toNYDate, getNYNow, formatNYDate } from '../utils/dateUtils';
-import { addDays, subMonths } from 'date-fns';
+import { addDays } from 'date-fns';
 import { createClient, RedisClientType } from 'redis';
 import * as fs from 'fs';
 import * as path from 'path';

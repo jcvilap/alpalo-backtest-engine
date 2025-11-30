@@ -40,6 +40,8 @@ export interface BacktestConfig {
     displayFrom?: string;
 }
 
+import { MarketSnapshot, PortfolioState, StrategyDecision } from '../strategy/types';
+
 /**
  * BacktestRunner - Orchestrates backtesting using the new architecture
  */
@@ -48,6 +50,7 @@ export class BacktestRunner {
     private broker: Broker;
     private params: StrategyParams;
     private portfolioManager: PortfolioManager;
+    private strategyFunction: (snapshot: MarketSnapshot, portfolio: PortfolioState, params: StrategyParams) => StrategyDecision;
 
     /**
      * Create a new BacktestRunner
@@ -55,12 +58,21 @@ export class BacktestRunner {
      * @param dataFeed - Data feed implementation
      * @param broker - Broker implementation
      * @param params - Strategy parameters
+     * @param strategyFunction - Strategy function to execute (defaults to current strategy if not provided)
      */
-    constructor(dataFeed: DataFeed, broker: Broker, params: StrategyParams) {
+    constructor(
+        dataFeed: DataFeed,
+        broker: Broker,
+        params: StrategyParams,
+        strategyFunction?: (snapshot: MarketSnapshot, portfolio: PortfolioState, params: StrategyParams) => StrategyDecision
+    ) {
         this.dataFeed = dataFeed;
         this.broker = broker;
         this.params = params;
         this.portfolioManager = new PortfolioManager();
+        // Default to the imported runStrategy for backward compatibility, 
+        // but allow injection for multi-strategy support
+        this.strategyFunction = strategyFunction || runStrategy;
     }
 
     /**
@@ -80,13 +92,7 @@ export class BacktestRunner {
         const qqqData = await this.dataFeed.getHistoricalData('QQQ', firstDate, lastDate);
         const tqqqData = await this.dataFeed.getHistoricalData('TQQQ', firstDate, lastDate);
 
-        console.log('[BACKTEST RUNNER] Setup:', {
-            initialCapital: config.initialCapital,
-            qqqDataLength: qqqData.length,
-            dateRange: { first: firstDate, last: lastDate },
-            displayFrom: config.displayFrom,
-            warmupPeriod: this.params.maPeriods.long
-        });
+
 
         // Setup benchmark tracking
         const initialBenchmarkPrice = qqqData[0]?.close || 1;
@@ -131,8 +137,8 @@ export class BacktestRunner {
             // Get portfolio state
             const portfolio = await this.broker.getPortfolioState();
 
-            // Run strategy engine
-            const decision = runStrategy(snapshot, portfolio, this.params);
+            // Run strategy engine using the injected function
+            const decision = this.strategyFunction(snapshot, portfolio, this.params);
 
             // Calculate orders using PortfolioManager
             const currentPos = portfolio.position;

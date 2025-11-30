@@ -38,13 +38,16 @@ const colors = {
     gray: '\x1b[90m',
 };
 
+import { getStrategy, AVAILABLE_STRATEGIES } from '../src/strategy/registry';
+
 async function runBacktest(
     qqqData: OHLC[],
     tqqqData: OHLC[],
     sqqqData: OHLC[],
     capital: number,
     displayFrom: string,
-    displayTo?: string
+    displayTo: string | undefined,
+    strategyName: string
 ): Promise<BacktestResult> {
     // Filter data to match the requested range (up to displayTo)
     // We don't filter start here because the engine needs warmup data before displayFrom
@@ -62,7 +65,11 @@ async function runBacktest(
     const dataFeed = new BacktestDataFeed(filteredQQQ, filteredTQQQ, filteredSQQQ);
     const broker = new BacktestBroker(capital);
     const params = createDefaultStrategyParams();
-    const runner = new BacktestRunner(dataFeed, broker, params);
+
+    // Load the requested strategy
+    const strategy = getStrategy(strategyName);
+
+    const runner = new BacktestRunner(dataFeed, broker, params, strategy);
 
     const { firstDate, lastDate } = dataFeed.getAvailableDateRange();
 
@@ -82,6 +89,7 @@ async function main() {
     const args = process.argv.slice(2);
     let capital: number = 1_000_000;
     let ranges: string[] = [];
+    let strategies: string[] = ['current'];
 
     // Parse arguments
     for (let i = 0; i < args.length; i++) {
@@ -91,19 +99,27 @@ async function main() {
                 capital = Number(args[i + 1]);
                 i++;
             }
-        } else if (!arg.startsWith('--')) {
-            // Handle comma-separated list
-            if (arg.includes(',')) {
-                ranges = arg.split(',').map(r => r.trim());
-            } else {
-                ranges.push(arg);
-            }
+        } else if (arg.startsWith('--timeframes=')) {
+            const val = arg.split('=')[1];
+            ranges = val.split(',').map(r => r.trim());
+        } else if (arg.startsWith('--strategies=')) {
+            const val = arg.split('=')[1];
+            strategies = val.split(',').map(s => s.trim());
         }
     }
 
     if (ranges.length === 0) {
         // Default to running all predefined timeframes
         ranges = [...DATE_RANGE_OPTIONS];
+    }
+
+    // Validate strategies
+    const availableStrategies = Object.keys(AVAILABLE_STRATEGIES);
+    const invalidStrategies = strategies.filter(s => !availableStrategies.includes(s));
+    if (invalidStrategies.length > 0) {
+        console.error(`${colors.red}❌ Invalid strategies: ${invalidStrategies.join(', ')}${colors.reset}`);
+        console.error(`Available strategies: ${availableStrategies.join(', ')}`);
+        process.exit(1);
     }
 
     // 1. Determine Fetch Range (widest possible)
@@ -154,28 +170,95 @@ async function main() {
 
         console.log(`${colors.green}✓ Loaded ${qqqData.length} trading days${colors.reset}\n`);
 
-        if (ranges.length === 1) {
-            // Single Mode
-            const config = rangeConfigs[0];
-            console.log(`${colors.gray}⚡ Running backtest for ${config.label}...${colors.reset}`);
-            const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end);
-            printBacktestResult(result, config.start, config.end, capital, { mode: 'cli' });
-        } else {
-            // Multi Mode
-            console.log(`${colors.gray}⚡ Running backtests for: ${ranges.join(', ')}...${colors.reset}`);
+        // Run backtests for all combinations of strategies and timeframes
+        const allResults: { strategy: string; range: string; result: BacktestResult }[] = [];
 
-            const results = await Promise.all(rangeConfigs.map(async (config) => {
-                const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end);
-                return { range: config.label, result };
-            }));
+        for (const strategy of strategies) {
+            console.log(`${colors.bright}🔹 Strategy: ${strategy}${colors.reset}`);
 
-            printComparisonTable(results, { mode: 'cli' });
+            if (ranges.length === 1 && strategies.length === 1) {
+                // Single Mode
+                const config = rangeConfigs[0];
+                console.log(`${colors.gray}⚡ Running backtest for ${config.label}...${colors.reset}`);
+                const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end, strategy);
+                printBacktestResult(result, config.start, config.end, capital, { mode: 'cli' });
+            } else {
+                // Multi Mode (either multiple ranges or multiple strategies)
+                console.log(`${colors.gray}⚡ Running backtests for: ${ranges.join(', ')}...${colors.reset}`);
+
+                const results = await Promise.all(rangeConfigs.map(async (config) => {
+                    const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end, strategy);
+                    return { strategy, range: config.label, result };
+                }));
+
+                allResults.push(...results);
+            }
+        }
+
+        // If we have multiple results (either multiple strategies or multiple ranges), print comparison table
+        if (allResults.length > 0 && (ranges.length > 1 || strategies.length > 1)) {
+            console.log(`\n${colors.bright}📊 Strategy Comparison${colors.reset}`);
+
+            // Collect all unique ranges
+            const uniqueRanges = Array.from(new Set(allResults.map(r => r.range)));
+
+            // Header
+            const header = [
+                'Range'.padEnd(10),
+                ...strategies.map(s => s.padEnd(25)),
+                'QQQ'.padEnd(12),
+                'TQQQ'.padEnd(12)
+            ].join('  ');
+
+            console.log(`${colors.gray}──────────────────────────────────────────────────────────────────────────────────────────${colors.reset}`);
+            console.log(header);
+            console.log(`${colors.gray}──────────────────────────────────────────────────────────────────────────────────────────${colors.reset}`);
+
+            for (const range of uniqueRanges) {
+                const rowParts: string[] = [range.padEnd(10)];
+
+                // Strategy columns
+                for (const strategy of strategies) {
+                    const result = allResults.find(r => r.range === range && r.strategy === strategy)?.result;
+                    if (result) {
+                        const totalReturn = result.metrics.totalReturn.toFixed(2) + '%';
+                        const cagr = result.metrics.cagr.toFixed(2) + '%';
+                        const cell = `${totalReturn} (${cagr} CAGR)`;
+
+                        // Color based on return
+                        const color = result.metrics.totalReturn >= 0 ? colors.green : colors.red;
+                        rowParts.push(`${color}${cell.padEnd(25)}${colors.reset}`);
+                    } else {
+                        rowParts.push('-'.padEnd(25));
+                    }
+                }
+
+                // Benchmark columns (using the first available result for this range)
+                const anyResult = allResults.find(r => r.range === range)?.result;
+                if (anyResult) {
+                    const qqqReturn = anyResult.metrics.benchmark.totalReturn.toFixed(2) + '%';
+                    const qqqColor = anyResult.metrics.benchmark.totalReturn >= 0 ? colors.green : colors.red;
+                    rowParts.push(`${qqqColor}${qqqReturn.padEnd(12)}${colors.reset}`);
+
+                    const tqqqReturn = anyResult.metrics.benchmarkTQQQ.totalReturn.toFixed(2) + '%';
+                    const tqqqColor = anyResult.metrics.benchmarkTQQQ.totalReturn >= 0 ? colors.green : colors.red;
+                    rowParts.push(`${tqqqColor}${tqqqReturn.padEnd(12)}${colors.reset}`);
+                } else {
+                    rowParts.push('-'.padEnd(12));
+                    rowParts.push('-'.padEnd(12));
+                }
+
+                console.log(rowParts.join('  '));
+            }
+            console.log(`${colors.gray}──────────────────────────────────────────────────────────────────────────────────────────${colors.reset}`);
         }
 
     } catch (error) {
         console.error(`\n${colors.red}❌ Error running backtest:${colors.reset}`, error);
         process.exit(1);
     }
+    // Force exit to ensure all resources (like Redis) are closed
+    process.exit(0);
 }
 
 main();
