@@ -40,6 +40,13 @@ export interface BacktestConfig {
     displayFrom?: string;
 }
 
+export interface StrategyRunConfig {
+    name: string;
+    broker: Broker;
+    params: StrategyParams;
+    strategyFunction?: (snapshot: MarketSnapshot, portfolio: PortfolioState, params: StrategyParams) => StrategyDecision;
+}
+
 import { MarketSnapshot, PortfolioState, StrategyDecision } from '../strategy/types';
 
 /**
@@ -82,19 +89,26 @@ export class BacktestRunner {
      * @returns Backtest results with trades, equity curve, and metrics
      */
     async run(config: BacktestConfig): Promise<BacktestResult> {
-        const trades: Trade[] = [];
-        const equityCurve: { date: string; equity: number; benchmark: number; benchmarkTQQQ: number }[] = [];
+        const results = await this.runMultiple(config, [{
+            name: 'default',
+            broker: this.broker,
+            params: this.params,
+            strategyFunction: this.strategyFunction
+        }]);
 
-        // Get available date range
+        return results['default'];
+    }
+
+    async runMultiple(config: BacktestConfig, strategies: StrategyRunConfig[]): Promise<Record<string, BacktestResult>> {
+        if (strategies.length === 0) {
+            return {};
+        }
+
         const { firstDate, lastDate } = this.dataFeed.getAvailableDateRange();
 
-        // Fetch all data for the period
         const qqqData = await this.dataFeed.getHistoricalData('QQQ', firstDate, lastDate);
         const tqqqData = await this.dataFeed.getHistoricalData('TQQQ', firstDate, lastDate);
 
-
-
-        // Setup benchmark tracking
         const initialBenchmarkPrice = qqqData[0]?.close || 1;
         const benchmarkShares = config.initialCapital / initialBenchmarkPrice;
 
@@ -102,10 +116,20 @@ export class BacktestRunner {
         const initialTQQQPrice = tqqqMap.get(qqqData[0]?.date)?.close || 1;
         const benchmarkTQQQShares = config.initialCapital / initialTQQQPrice;
 
-        let currentPosition: Trade | null = null;
+        const contexts = strategies.map(strategy => ({
+            name: strategy.name,
+            broker: strategy.broker,
+            params: strategy.params,
+            strategyFunction: strategy.strategyFunction || runStrategy,
+            portfolioManager: new PortfolioManager(),
+            trades: [] as Trade[],
+            equityCurve: [] as { date: string; equity: number; benchmark: number; benchmarkTQQQ: number }[],
+            currentPosition: null as Trade | null
+        }));
 
-        // Phase 1: Warmup (strategy in cash, track benchmarks only)
-        for (let i = 0; i < this.params.maPeriods.long && i < qqqData.length; i++) {
+        const warmupPeriod = Math.max(...contexts.map(c => c.params.maPeriods.long));
+
+        for (let i = 0; i < warmupPeriod && i < qqqData.length; i++) {
             const date = qqqData[i].date;
             const tqqqCandle = tqqqMap.get(date);
 
@@ -117,172 +141,180 @@ export class BacktestRunner {
             const benchmarkPct = ((benchmarkEquity - config.initialCapital) / config.initialCapital) * 100;
             const benchmarkTQQQPct = ((benchmarkTQQQEquity - config.initialCapital) / config.initialCapital) * 100;
 
-            // Strategy is in cash (0% return)
-            equityCurve.push({ date, equity: 0, benchmark: benchmarkPct, benchmarkTQQQ: benchmarkTQQQPct });
+            for (const context of contexts) {
+                context.equityCurve.push({ date, equity: 0, benchmark: benchmarkPct, benchmarkTQQQ: benchmarkTQQQPct });
+            }
         }
 
-        // Phase 2: Trading
-        for (let i = this.params.maPeriods.long; i < qqqData.length; i++) {
+        for (let i = warmupPeriod; i < qqqData.length; i++) {
             const date = qqqData[i].date;
 
-            // Get market snapshot
             const snapshot = await this.dataFeed.getSnapshotForDate(date);
             if (!snapshot) continue;
 
-            // Update broker with current prices
-            if (this.broker instanceof BacktestBroker) {
-                this.broker.updatePrices(snapshot.prices);
-            }
-
-            // Get portfolio state
-            const portfolio = await this.broker.getPortfolioState();
-
-            // Run strategy engine using the injected function
-            const decision = this.strategyFunction(snapshot, portfolio, this.params);
-
-            // Calculate orders using PortfolioManager
-            const currentPos = portfolio.position;
-            const orders = this.portfolioManager.calculateOrders(
-                decision,
-                currentPos,
-                portfolio.totalEquity,
-                snapshot.prices
-            );
-
-            // Execute orders and track trades
-            if (orders.length > 0) {
-                const results = await this.broker.placeOrders(orders);
-
-                // Track trades (convert orders to trades)
-                for (const result of results) {
-                    if (result.success && result.order.side === 'SELL' && currentPosition) {
-                        // Record completed trade
-                        const trade: Trade = {
-                            ...currentPosition,
-                            exitDate: date,
-                            exitPrice: result.fillPrice,
-                            shares: result.filledShares,
-                            pnl: (result.fillPrice - currentPosition.entryPrice) * result.filledShares,
-                            returnPct: ((result.fillPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100,
-                            daysHeld: Math.round((toNYDate(date).getTime() - toNYDate(currentPosition.entryDate).getTime()) / (1000 * 60 * 60 * 24))
-                        };
-                        trade.portfolioReturnPct = (trade.returnPct! * (trade.positionSizePct || 0)) / 100;
-                        trades.push(trade);
-
-                        // Check if position is fully closed
-                        const updatedPortfolio = await this.broker.getPortfolioState();
-                        if (!updatedPortfolio.position || updatedPortfolio.position.shares === 0) {
-                            currentPosition = null;
-                        } else {
-                            currentPosition.shares = updatedPortfolio.position.shares;
-                        }
-                    } else if (result.success && result.order.side === 'BUY') {
-                        // Update or create current position
-                        const updatedPortfolio = await this.broker.getPortfolioState();
-                        if (updatedPortfolio.position) {
-                            const cost = result.filledShares * result.fillPrice;
-                            const newPosition: Trade = {
-                                entryDate: currentPosition?.entryDate || date,
-                                symbol: result.order.symbol,
-                                side: 'LONG',
-                                entryPrice: updatedPortfolio.position.avgEntryPrice,
-                                shares: updatedPortfolio.position.shares,
-                                positionSizePct: (cost / portfolio.totalEquity) * 100
-                            };
-                            currentPosition = newPosition;
-                        }
-                    }
-                }
-            }
-
-            // Calculate equity for this period
-            const updatedPortfolio = await this.broker.getPortfolioState();
             const benchmarkEquity = benchmarkShares * qqqData[i].close;
             const tqqqCandle = tqqqMap.get(date);
             const benchmarkTQQQEquity = tqqqCandle ? benchmarkTQQQShares * tqqqCandle.close : 0;
 
-            const equityPct = ((updatedPortfolio.totalEquity - config.initialCapital) / config.initialCapital) * 100;
             const benchmarkPct = ((benchmarkEquity - config.initialCapital) / config.initialCapital) * 100;
             const benchmarkTQQQPct = ((benchmarkTQQQEquity - config.initialCapital) / config.initialCapital) * 100;
 
-            equityCurve.push({ date, equity: equityPct, benchmark: benchmarkPct, benchmarkTQQQ: benchmarkTQQQPct });
-        }
+            for (const context of contexts) {
+                const broker = context.broker;
 
-        // Close final position if any
-        if (currentPosition) {
-            const lastDate = qqqData[qqqData.length - 1].date;
-            const snapshot = await this.dataFeed.getSnapshotForDate(lastDate);
-
-            if (snapshot) {
-                const exitPrice = snapshot.prices[currentPosition.symbol];
-
-                const trade: Trade = {
-                    ...currentPosition,
-                    exitDate: lastDate,
-                    exitPrice: exitPrice,
-                    pnl: (exitPrice - currentPosition.entryPrice) * currentPosition.shares,
-                    returnPct: ((exitPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100,
-                    daysHeld: Math.round((toNYDate(lastDate).getTime() - toNYDate(currentPosition.entryDate).getTime()) / (1000 * 60 * 60 * 24))
-                };
-                trade.portfolioReturnPct = (trade.returnPct! * (trade.positionSizePct || 0)) / 100;
-                trades.push(trade);
-            }
-        }
-
-        // Filter and rebase results if displayFrom is provided
-        let finalTrades = trades;
-        let finalEquityCurve = equityCurve;
-
-        if (config.displayFrom) {
-            const displayDate = toNYDate(config.displayFrom);
-
-            // Filter trades
-            finalTrades = trades.filter(t => {
-                const exitDate = t.exitDate ? toNYDate(t.exitDate) : getNYNow();
-                return exitDate >= displayDate;
-            });
-
-            // Filter and rebase equity curve
-            const startIndex = equityCurve.findIndex(d => toNYDate(d.date) >= displayDate);
-
-            if (startIndex !== -1) {
-                const basePoint = equityCurve[startIndex];
-
-                const baseEquityMult = 1 + (basePoint.equity / 100);
-                const baseBenchmarkMult = 1 + (basePoint.benchmark / 100);
-                const baseTQQQMult = 1 + (basePoint.benchmarkTQQQ / 100);
-
-                finalEquityCurve = equityCurve.slice(startIndex).map(d => {
-                    const currentEquityMult = 1 + (d.equity / 100);
-                    const currentBenchmarkMult = 1 + (d.benchmark / 100);
-                    const currentTQQQMult = 1 + (d.benchmarkTQQQ / 100);
-
-                    return {
-                        date: d.date,
-                        equity: ((currentEquityMult / baseEquityMult) - 1) * 100,
-                        benchmark: ((currentBenchmarkMult / baseBenchmarkMult) - 1) * 100,
-                        benchmarkTQQQ: ((currentTQQQMult / baseTQQQMult) - 1) * 100
-                    };
-                });
-
-                if (finalEquityCurve.length > 0 && finalEquityCurve[0].date > config.displayFrom) {
-                    finalEquityCurve.unshift({
-                        date: config.displayFrom,
-                        equity: 0,
-                        benchmark: 0,
-                        benchmarkTQQQ: 0
-                    });
+                if (broker instanceof BacktestBroker) {
+                    broker.updatePrices(snapshot.prices);
                 }
-            } else {
-                finalEquityCurve = [];
+
+                const portfolio = await broker.getPortfolioState();
+                const decision = context.strategyFunction(snapshot, portfolio, context.params);
+
+                const orders = context.portfolioManager.calculateOrders(
+                    decision,
+                    portfolio.position,
+                    portfolio.totalEquity,
+                    snapshot.prices
+                );
+
+                if (orders.length > 0) {
+                    const results = await broker.placeOrders(orders);
+
+                    for (const result of results) {
+                        if (result.success && result.order.side === 'SELL' && context.currentPosition) {
+                            const trade: Trade = {
+                                ...context.currentPosition,
+                                exitDate: date,
+                                exitPrice: result.fillPrice,
+                                shares: result.filledShares,
+                                pnl: (result.fillPrice - context.currentPosition.entryPrice) * result.filledShares,
+                                returnPct: ((result.fillPrice - context.currentPosition.entryPrice) / context.currentPosition.entryPrice) * 100,
+                                daysHeld: Math.round((toNYDate(date).getTime() - toNYDate(context.currentPosition.entryDate).getTime()) / (1000 * 60 * 60 * 24))
+                            };
+                            trade.portfolioReturnPct = (trade.returnPct! * (trade.positionSizePct || 0)) / 100;
+                            context.trades.push(trade);
+
+                            const updatedPortfolio = await broker.getPortfolioState();
+                            if (!updatedPortfolio.position || updatedPortfolio.position.shares === 0) {
+                                context.currentPosition = null;
+                            } else {
+                                context.currentPosition.shares = updatedPortfolio.position.shares;
+                            }
+                        } else if (result.success && result.order.side === 'BUY') {
+                            const updatedPortfolio = await broker.getPortfolioState();
+                            if (updatedPortfolio.position) {
+                                const cost = result.filledShares * result.fillPrice;
+                                const newPosition: Trade = {
+                                    entryDate: context.currentPosition?.entryDate || date,
+                                    symbol: result.order.symbol,
+                                    side: 'LONG',
+                                    entryPrice: updatedPortfolio.position.avgEntryPrice,
+                                    shares: updatedPortfolio.position.shares,
+                                    positionSizePct: (cost / portfolio.totalEquity) * 100
+                                };
+                                context.currentPosition = newPosition;
+                            }
+                        }
+                    }
+                }
+
+                const updatedPortfolio = await broker.getPortfolioState();
+                const equityPct = ((updatedPortfolio.totalEquity - config.initialCapital) / config.initialCapital) * 100;
+
+                context.equityCurve.push({
+                    date,
+                    equity: equityPct,
+                    benchmark: benchmarkPct,
+                    benchmarkTQQQ: benchmarkTQQQPct
+                });
             }
         }
 
-        return {
-            trades: finalTrades,
-            equityCurve: finalEquityCurve,
-            metrics: this.calculateMetrics(finalEquityCurve, finalTrades)
-        };
+        const results: Record<string, BacktestResult> = {};
+
+        for (const context of contexts) {
+            if (context.currentPosition) {
+                const lastDate = qqqData[qqqData.length - 1].date;
+                const snapshot = await this.dataFeed.getSnapshotForDate(lastDate);
+
+                if (snapshot) {
+                    const exitPrice = snapshot.prices[context.currentPosition.symbol];
+
+                    const trade: Trade = {
+                        ...context.currentPosition,
+                        exitDate: lastDate,
+                        exitPrice: exitPrice,
+                        pnl: (exitPrice - context.currentPosition.entryPrice) * context.currentPosition.shares,
+                        returnPct: ((exitPrice - context.currentPosition.entryPrice) / context.currentPosition.entryPrice) * 100,
+                        daysHeld: Math.round((toNYDate(lastDate).getTime() - toNYDate(context.currentPosition.entryDate).getTime()) / (1000 * 60 * 60 * 24))
+                    };
+                    trade.portfolioReturnPct = (trade.returnPct! * (trade.positionSizePct || 0)) / 100;
+                    context.trades.push(trade);
+                }
+            }
+
+            const { finalEquityCurve, finalTrades } = this.applyDisplayFrom(context.equityCurve, context.trades, config);
+
+            results[context.name] = {
+                trades: finalTrades,
+                equityCurve: finalEquityCurve,
+                metrics: this.calculateMetrics(finalEquityCurve, finalTrades)
+            };
+        }
+
+        return results;
+    }
+
+    private applyDisplayFrom(
+        equityCurve: { date: string; equity: number; benchmark: number; benchmarkTQQQ: number }[],
+        trades: Trade[],
+        config: BacktestConfig
+    ) {
+        if (!config.displayFrom) {
+            return { finalEquityCurve: equityCurve, finalTrades: trades };
+        }
+
+        const displayDate = toNYDate(config.displayFrom);
+
+        const filteredTrades = trades.filter(t => {
+            const exitDate = t.exitDate ? toNYDate(t.exitDate) : getNYNow();
+            return exitDate >= displayDate;
+        });
+
+        const startIndex = equityCurve.findIndex(d => toNYDate(d.date) >= displayDate);
+
+        if (startIndex === -1) {
+            return { finalEquityCurve: [], finalTrades: filteredTrades };
+        }
+
+        const basePoint = equityCurve[startIndex];
+
+        const baseEquityMult = 1 + (basePoint.equity / 100);
+        const baseBenchmarkMult = 1 + (basePoint.benchmark / 100);
+        const baseTQQQMult = 1 + (basePoint.benchmarkTQQQ / 100);
+
+        const rebasedEquity = equityCurve.slice(startIndex).map(d => {
+            const currentEquityMult = 1 + (d.equity / 100);
+            const currentBenchmarkMult = 1 + (d.benchmark / 100);
+            const currentTQQQMult = 1 + (d.benchmarkTQQQ / 100);
+
+            return {
+                date: d.date,
+                equity: ((currentEquityMult / baseEquityMult) - 1) * 100,
+                benchmark: ((currentBenchmarkMult / baseBenchmarkMult) - 1) * 100,
+                benchmarkTQQQ: ((currentTQQQMult / baseTQQQMult) - 1) * 100
+            };
+        });
+
+        if (rebasedEquity.length > 0 && rebasedEquity[0].date > config.displayFrom) {
+            rebasedEquity.unshift({
+                date: config.displayFrom,
+                equity: 0,
+                benchmark: 0,
+                benchmarkTQQQ: 0
+            });
+        }
+
+        return { finalEquityCurve: rebasedEquity, finalTrades: filteredTrades };
     }
 
     /**

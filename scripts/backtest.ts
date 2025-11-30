@@ -20,7 +20,7 @@ import { BacktestResult } from '../src/lib/backtest/backtestEngine';
 import { PolygonClient } from '../src/lib/polygon/client';
 import { getDateRange, DATE_RANGE_OPTIONS, DateRangeKey, getNYNow, formatNYDate, toNYDate } from '../src/lib/utils/dateUtils';
 import { fetchBacktestData } from '../src/lib/backtest/dataFetcher';
-import { printBacktestResult, printComparisonTable } from '../src/lib/utils/resultPrinter';
+import { printBacktestResult } from '../src/lib/utils/resultPrinter';
 import { BacktestDataFeed } from '../src/backtest/BacktestDataFeed';
 import { BacktestBroker } from '../src/backtest/BacktestBroker';
 import { BacktestRunner } from '../src/backtest/BacktestRunner';
@@ -40,17 +40,15 @@ const colors = {
 
 import { getStrategy, AVAILABLE_STRATEGIES } from '../src/strategy/registry';
 
-async function runBacktest(
+async function runBacktests(
     qqqData: OHLC[],
     tqqqData: OHLC[],
     sqqqData: OHLC[],
     capital: number,
     displayFrom: string,
     displayTo: string | undefined,
-    strategyName: string
-): Promise<BacktestResult> {
-    // Filter data to match the requested range (up to displayTo)
-    // We don't filter start here because the engine needs warmup data before displayFrom
+    strategyNames: string[]
+): Promise<{ strategy: string; result: BacktestResult }[]> {
     let filteredQQQ = qqqData;
     let filteredTQQQ = tqqqData;
     let filteredSQQQ = sqqqData;
@@ -63,22 +61,34 @@ async function runBacktest(
     }
 
     const dataFeed = new BacktestDataFeed(filteredQQQ, filteredTQQQ, filteredSQQQ);
-    const broker = new BacktestBroker(capital);
-    const params = createDefaultStrategyParams();
 
-    // Load the requested strategy
-    const strategy = getStrategy(strategyName);
+    const strategyConfigs = strategyNames.map(name => ({
+        name,
+        broker: new BacktestBroker(capital),
+        params: createDefaultStrategyParams(),
+        strategyFunction: getStrategy(name)
+    }));
 
-    const runner = new BacktestRunner(dataFeed, broker, params, strategy);
+    const runner = new BacktestRunner(
+        dataFeed,
+        strategyConfigs[0].broker,
+        strategyConfigs[0].params,
+        strategyConfigs[0].strategyFunction
+    );
 
     const { firstDate, lastDate } = dataFeed.getAvailableDateRange();
 
-    return runner.run({
-        startDate: firstDate,
-        endDate: lastDate,
-        initialCapital: capital,
-        displayFrom
-    });
+    const results = await runner.runMultiple(
+        {
+            startDate: firstDate,
+            endDate: lastDate,
+            initialCapital: capital,
+            displayFrom
+        },
+        strategyConfigs
+    );
+
+    return strategyNames.map(strategy => ({ strategy, result: results[strategy] }));
 }
 
 async function main() {
@@ -173,29 +183,22 @@ async function main() {
         // Run backtests for all combinations of strategies and timeframes
         const allResults: { strategy: string; range: string; result: BacktestResult }[] = [];
 
-        for (const strategy of strategies) {
-            console.log(`${colors.bright}🔹 Strategy: ${strategy}${colors.reset}`);
+        if (ranges.length === 1 && strategies.length === 1) {
+            const config = rangeConfigs[0];
+            console.log(`${colors.gray}⚡ Running backtest for ${config.label}...${colors.reset}`);
+            const [{ result }] = await runBacktests(qqqData, tqqqData, sqqqData, capital, config.start, config.end, strategies);
+            printBacktestResult(result, config.start, config.end, capital, { mode: 'cli' });
+        } else {
+            console.log(`${colors.gray}⚡ Running backtests for: ${ranges.join(', ')}...${colors.reset}`);
 
-            if (ranges.length === 1 && strategies.length === 1) {
-                // Single Mode
-                const config = rangeConfigs[0];
-                console.log(`${colors.gray}⚡ Running backtest for ${config.label}...${colors.reset}`);
-                const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end, strategy);
-                printBacktestResult(result, config.start, config.end, capital, { mode: 'cli' });
-            } else {
-                // Multi Mode (either multiple ranges or multiple strategies)
-                console.log(`${colors.gray}⚡ Running backtests for: ${ranges.join(', ')}...${colors.reset}`);
-
-                const results = await Promise.all(rangeConfigs.map(async (config) => {
-                    const result = await runBacktest(qqqData, tqqqData, sqqqData, capital, config.start, config.end, strategy);
-                    return { strategy, range: config.label, result };
-                }));
-
-                allResults.push(...results);
+            for (const config of rangeConfigs) {
+                const resultsForRange = await runBacktests(qqqData, tqqqData, sqqqData, capital, config.start, config.end, strategies);
+                for (const { strategy, result } of resultsForRange) {
+                    allResults.push({ strategy, range: config.label, result });
+                }
             }
         }
 
-        // If we have multiple results (either multiple strategies or multiple ranges), print comparison table
         if (allResults.length > 0 && (ranges.length > 1 || strategies.length > 1)) {
             console.log(`\n${colors.bright}📊 Strategy Comparison${colors.reset}`);
 
