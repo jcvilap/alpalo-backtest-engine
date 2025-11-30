@@ -26,6 +26,10 @@ export class BacktestDataFeed implements DataFeed {
     private tqqqByDate: Map<string, OHLC>;
     private sqqqByDate: Map<string, OHLC>;
 
+    // Cache for QQQ history slices to avoid redundant array copying
+    // Key: qqqIndex, Value: cached slice
+    private qqqHistoryCache: Map<number, OHLC[]>;
+
     /**
      * Create a new BacktestDataFeed
      *
@@ -42,6 +46,9 @@ export class BacktestDataFeed implements DataFeed {
         this.qqqByDate = new Map(qqqData.map(d => [d.date, d]));
         this.tqqqByDate = new Map(tqqqData.map(d => [d.date, d]));
         this.sqqqByDate = new Map(sqqqData.map(d => [d.date, d]));
+
+        // Initialize history cache
+        this.qqqHistoryCache = new Map();
     }
 
     /**
@@ -81,6 +88,10 @@ export class BacktestDataFeed implements DataFeed {
      * - Current TQQQ and SQQQ bars
      * - Current prices
      *
+     * Performance optimization:
+     * - Caches QQQ history slices to avoid redundant array copying
+     * - For "ALL" timeframe (6,300+ days), this eliminates ~20 million array element copies
+     *
      * @param date - Target date (YYYY-MM-DD)
      * @returns MarketSnapshot or null if data is missing
      */
@@ -100,8 +111,13 @@ export class BacktestDataFeed implements DataFeed {
             return null;
         }
 
-        // Get all QQQ history up to and including this date
-        const qqqHistory = this.qqqData.slice(0, qqqIndex + 1);
+        // Get all QQQ history up to and including this date (with caching)
+        let qqqHistory = this.qqqHistoryCache.get(qqqIndex);
+        if (!qqqHistory) {
+            // First time accessing this index, create and cache the slice
+            qqqHistory = this.qqqData.slice(0, qqqIndex + 1);
+            this.qqqHistoryCache.set(qqqIndex, qqqHistory);
+        }
 
         return {
             date,

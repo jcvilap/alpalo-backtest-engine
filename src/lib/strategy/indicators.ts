@@ -1,4 +1,5 @@
 import { OHLC } from '../types';
+import { IndicatorCache } from './indicatorCache';
 
 /**
  * Technical Indicators for Trading Strategy
@@ -11,6 +12,11 @@ import { OHLC } from '../types';
  * All indicators use closing prices and are aligned to the OHLC data array indices.
  * The first N-1 elements are not included in results (where N is the period).
  *
+ * Performance Optimization:
+ * - Uses internal caching to avoid redundant calculations
+ * - Sliding window algorithms for O(n) complexity instead of O(n × period)
+ * - Cache is shared across strategies in the same backtest session
+ *
  * @example
  * ```typescript
  * const ma50 = Indicators.simpleMovingAverage(ohlcData, 50);
@@ -19,11 +25,34 @@ import { OHLC } from '../types';
  * ```
  */
 export class Indicators {
+    // Singleton cache for memoization across strategies
+    private static cache = new IndicatorCache();
+
+    /**
+     * Clear the internal cache
+     *
+     * Should be called between different backtest runs to avoid
+     * memory buildup and ensure fresh calculations for new data.
+     */
+    static clearCache(): void {
+        this.cache.clear();
+    }
+
+    /**
+     * Get cache statistics for monitoring
+     */
+    static getCacheStats() {
+        return this.cache.getStats();
+    }
     /**
      * Calculate Simple Moving Average (SMA)
      *
      * Computes the arithmetic mean of closing prices over a rolling window.
      * Used for trend identification and support/resistance levels.
+     *
+     * Optimized with:
+     * - Internal caching to avoid redundant calculations
+     * - O(n) sliding window algorithm instead of O(n × period)
      *
      * @param data - Array of OHLC candlesticks
      * @param period - Lookback period in days
@@ -38,15 +67,35 @@ export class Indicators {
      * ```
      */
     static simpleMovingAverage(data: OHLC[], period: number): number[] {
+        // Try to get from cache first, pass compute function to avoid circular dependency
+        return this.cache.getSMA(data, period, this._computeSMA);
+    }
+
+    /**
+     * Internal method for computing SMA without cache
+     * Used by IndicatorCache when value not found
+     */
+    static _computeSMA(data: OHLC[], period: number): number[] {
         if (data.length < period) {
             return [];
         }
 
         const sma: number[] = [];
-        for (let i = period - 1; i < data.length; i++) {
-            const sum = data.slice(i - period + 1, i + 1).reduce((acc, candle) => acc + candle.close, 0);
+        let sum = 0;
+
+        // Calculate initial window sum - O(period)
+        for (let i = 0; i < period; i++) {
+            sum += data[i].close;
+        }
+        sma.push(sum / period);
+
+        // Use sliding window for subsequent values - O(1) per iteration
+        // Remove oldest value, add newest value
+        for (let i = period; i < data.length; i++) {
+            sum = sum - data[i - period].close + data[i].close;
             sma.push(sum / period);
         }
+
         return sma;
     }
 
@@ -57,6 +106,8 @@ export class Indicators {
      * Positive values indicate upward momentum, negative values indicate downward momentum.
      *
      * Formula: ROC = ((Current - Previous) / Previous) * 100
+     *
+     * Optimized with internal caching to avoid redundant calculations.
      *
      * @param data - Array of OHLC candlesticks
      * @param period - Lookback period in days
@@ -71,6 +122,15 @@ export class Indicators {
      * ```
      */
     static rateOfChange(data: OHLC[], period: number): number[] {
+        // Try to get from cache first, pass compute function to avoid circular dependency
+        return this.cache.getROC(data, period, this._computeROC);
+    }
+
+    /**
+     * Internal method for computing ROC without cache
+     * Used by IndicatorCache when value not found
+     */
+    static _computeROC(data: OHLC[], period: number): number[] {
         if (data.length < period) {
             return [];
         }
@@ -93,6 +153,10 @@ export class Indicators {
      * Formula: σ = sqrt(Σ(x - μ)² / N)
      * where μ is the mean of the window and N is the period
      *
+     * Optimized with:
+     * - Internal caching to avoid redundant calculations
+     * - O(n) sliding window algorithm using variance formula: Var(X) = E[X²] - E[X]²
+     *
      * @param data - Array of OHLC candlesticks
      * @param period - Lookback period in days
      * @returns Array of standard deviation values (length = data.length - period + 1)
@@ -108,17 +172,48 @@ export class Indicators {
      * ```
      */
     static rollingStdDev(data: OHLC[], period: number): number[] {
+        // Try to get from cache first, pass compute function to avoid circular dependency
+        return this.cache.getStdDev(data, period, this._computeStdDev);
+    }
+
+    /**
+     * Internal method for computing StdDev without cache
+     * Used by IndicatorCache when value not found
+     */
+    static _computeStdDev(data: OHLC[], period: number): number[] {
         if (data.length < period) {
             return [];
         }
 
         const std: number[] = [];
+        let sum = 0;
+        let sumOfSquares = 0;
 
-        for (let i = period - 1; i < data.length; i++) {
-            const window = data.slice(i - period + 1, i + 1).map(candle => candle.close);
-            const mean = window.reduce((acc, val) => acc + val, 0) / period;
-            const variance = window.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / period;
-            std.push(Math.sqrt(variance));
+        // Calculate initial window statistics - O(period)
+        for (let i = 0; i < period; i++) {
+            const value = data[i].close;
+            sum += value;
+            sumOfSquares += value * value;
+        }
+
+        // Calculate first standard deviation
+        const mean = sum / period;
+        const variance = (sumOfSquares / period) - (mean * mean);
+        std.push(Math.sqrt(Math.max(0, variance))); // Math.max to handle floating point errors
+
+        // Use sliding window for subsequent values - O(1) per iteration
+        for (let i = period; i < data.length; i++) {
+            const oldValue = data[i - period].close;
+            const newValue = data[i].close;
+
+            // Update running sums
+            sum = sum - oldValue + newValue;
+            sumOfSquares = sumOfSquares - (oldValue * oldValue) + (newValue * newValue);
+
+            // Calculate variance using: Var(X) = E[X²] - E[X]²
+            const mean = sum / period;
+            const variance = (sumOfSquares / period) - (mean * mean);
+            std.push(Math.sqrt(Math.max(0, variance))); // Math.max to handle floating point errors
         }
 
         return std;
