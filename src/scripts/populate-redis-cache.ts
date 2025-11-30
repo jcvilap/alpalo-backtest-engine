@@ -11,7 +11,11 @@
 import 'dotenv/config'; // Loads .env file from project root
 
 import { createClient } from 'redis';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PolygonClient } from '../lib/polygon/client';
+
+const CACHE_DIR = path.join(process.cwd(), 'cache');
 
 // ANSI color codes
 const colors = {
@@ -25,58 +29,76 @@ const colors = {
 
 interface CacheStatus {
     key: string;
-    exists: boolean;
-    size?: number;
+    redisExists: boolean;
+    redisSize?: number;
+    fsExists: boolean;
+    fsSize?: number;
     error?: string;
 }
 
 /**
  * Check Redis cache status
  */
-async function checkRedisCache(): Promise<CacheStatus[]> {
+/**
+ * Check Cache status (Redis + File System)
+ */
+async function checkCacheStatus(): Promise<CacheStatus[]> {
     const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
-        throw new Error('REDIS_URL environment variable is required');
-    }
+    const redis = redisUrl ? createClient({ url: redisUrl }) : null;
 
-    const redis = createClient({ url: redisUrl });
-    await redis.connect();
+    if (redis) {
+        await redis.connect().catch(e => console.warn('Redis connection failed:', e.message));
+    }
 
     const tickers = ['TQQQ', 'QQQ', 'SQQQ'];
     const year = new Date().getFullYear();
     const keysToCheck = [
-        ...tickers.map(t => `ohlc:${t}`),
-        `market-calendar-${year}`
+        ...tickers.map(t => ({ redisKey: `ohlc:${t}`, fsFile: `${t}.json` })),
+        { redisKey: `market-calendar-${year}`, fsFile: `market-calendar-${year}.json` }
     ];
 
     const results: CacheStatus[] = [];
 
-    for (const key of keysToCheck) {
+    for (const item of keysToCheck) {
+        const status: CacheStatus = {
+            key: item.redisKey,
+            redisExists: false,
+            fsExists: false
+        };
+
+        // Check Redis
+        if (redis && redis.isOpen) {
+            try {
+                const exists = await redis.exists(item.redisKey);
+                if (exists) {
+                    const data = await redis.get(item.redisKey);
+                    status.redisExists = true;
+                    status.redisSize = data ? Buffer.byteLength(data, 'utf8') : 0;
+                }
+            } catch (error) {
+                status.error = `Redis error: ${error instanceof Error ? error.message : String(error)}`;
+            }
+        }
+
+        // Check File System
         try {
-            const exists = await redis.exists(key);
-            if (exists) {
-                const data = await redis.get(key);
-                results.push({
-                    key,
-                    exists: true,
-                    size: data ? Buffer.byteLength(data, 'utf8') : 0
-                });
-            } else {
-                results.push({
-                    key,
-                    exists: false
-                });
+            const filePath = path.join(CACHE_DIR, item.fsFile);
+            if (fs.existsSync(filePath)) {
+                const stats = fs.statSync(filePath);
+                status.fsExists = true;
+                status.fsSize = stats.size;
             }
         } catch (error) {
-            results.push({
-                key,
-                exists: false,
-                error: error instanceof Error ? error.message : String(error)
-            });
+            const msg = `FS error: ${error instanceof Error ? error.message : String(error)}`;
+            status.error = status.error ? `${status.error} | ${msg}` : msg;
         }
+
+        results.push(status);
     }
 
-    await redis.quit();
+    if (redis && redis.isOpen) {
+        await redis.quit();
+    }
     return results;
 }
 
@@ -84,7 +106,7 @@ async function checkRedisCache(): Promise<CacheStatus[]> {
  * Populate Redis cache by fetching data from Polygon API
  */
 async function populateCache(): Promise<void> {
-    console.log(`${colors.blue}📥 Populating Redis cache from Polygon API...${colors.reset}\n`);
+    console.log(`${colors.blue}📥 Populating Cache (Redis + File System) from Polygon API...${colors.reset}\n`);
 
     const client = new PolygonClient();
     const tickers = ['TQQQ', 'QQQ', 'SQQQ'];
@@ -125,20 +147,25 @@ function formatBytes(bytes: number): string {
  */
 async function main() {
     console.log(`${colors.blue}═══════════════════════════════════════════════════════${colors.reset}`);
-    console.log(`${colors.blue}          Redis Cache Population Tool${colors.reset}`);
+    console.log(`${colors.blue}          Dual Cache Population Tool (Redis + FS)${colors.reset}`);
     console.log(`${colors.blue}═══════════════════════════════════════════════════════${colors.reset}\n`);
 
     try {
         // Check current cache status
-        console.log(`${colors.blue}🔍 Checking Redis cache status...${colors.reset}\n`);
-        const beforeStatus = await checkRedisCache();
+        console.log(`${colors.blue}🔍 Checking Cache status...${colors.reset}\n`);
+        const beforeStatus = await checkCacheStatus();
 
         let needsPopulation = false;
+        console.log('KEY'.padEnd(30) + 'REDIS'.padEnd(15) + 'FILE SYSTEM'.padEnd(15));
+        console.log('-'.repeat(60));
+
         for (const status of beforeStatus) {
-            if (status.exists) {
-                console.log(`${colors.green}✓ ${status.key.padEnd(25)} ${formatBytes(status.size || 0)}${colors.reset}`);
-            } else {
-                console.log(`${colors.yellow}○ ${status.key.padEnd(25)} Not cached${colors.reset}`);
+            const redisStr = status.redisExists ? `${colors.green}✓ ${formatBytes(status.redisSize || 0)}${colors.reset}` : `${colors.yellow}MISSING${colors.reset}`;
+            const fsStr = status.fsExists ? `${colors.green}✓ ${formatBytes(status.fsSize || 0)}${colors.reset}` : `${colors.yellow}MISSING${colors.reset}`;
+
+            console.log(`${status.key.padEnd(30)} ${redisStr.padEnd(24)} ${fsStr}`);
+
+            if (!status.redisExists || !status.fsExists) {
                 needsPopulation = true;
             }
         }
@@ -150,15 +177,20 @@ async function main() {
             await populateCache();
 
             // Check cache status again
-            console.log(`${colors.blue}🔍 Verifying Redis cache...${colors.reset}\n`);
-            const afterStatus = await checkRedisCache();
+            console.log(`${colors.blue}🔍 Verifying Cache...${colors.reset}\n`);
+            const afterStatus = await checkCacheStatus();
 
             let allPopulated = true;
+            console.log('KEY'.padEnd(30) + 'REDIS'.padEnd(15) + 'FILE SYSTEM'.padEnd(15));
+            console.log('-'.repeat(60));
+
             for (const status of afterStatus) {
-                if (status.exists) {
-                    console.log(`${colors.green}✓ ${status.key.padEnd(25)} ${formatBytes(status.size || 0)}${colors.reset}`);
-                } else {
-                    console.log(`${colors.red}✗ ${status.key.padEnd(25)} Failed to cache${colors.reset}`);
+                const redisStr = status.redisExists ? `${colors.green}✓ ${formatBytes(status.redisSize || 0)}${colors.reset}` : `${colors.red}FAILED${colors.reset}`;
+                const fsStr = status.fsExists ? `${colors.green}✓ ${formatBytes(status.fsSize || 0)}${colors.reset}` : `${colors.red}FAILED${colors.reset}`;
+
+                console.log(`${status.key.padEnd(30)} ${redisStr.padEnd(24)} ${fsStr}`);
+
+                if (!status.redisExists || !status.fsExists) {
                     allPopulated = false;
                 }
             }
@@ -166,16 +198,16 @@ async function main() {
             console.log();
 
             if (allPopulated) {
-                console.log(`${colors.green}✅ Redis cache successfully populated!${colors.reset}`);
-                console.log(`${colors.gray}   You can now safely remove the cache folder.${colors.reset}\n`);
+                console.log(`${colors.green}✅ Successfully populated both Redis and File System caches!${colors.reset}`);
+                console.log(`${colors.gray}   Both caches are now synchronized and ready for offline use.${colors.reset}\n`);
                 process.exit(0);
             } else {
                 console.log(`${colors.red}❌ Some cache entries failed to populate${colors.reset}\n`);
                 process.exit(1);
             }
         } else {
-            console.log(`${colors.green}✅ Redis cache is already populated!${colors.reset}`);
-            console.log(`${colors.gray}   You can safely remove the cache folder.${colors.reset}\n`);
+            console.log(`${colors.green}✅ Redis and File System caches are already fully populated and synchronized!${colors.reset}`);
+            console.log(`${colors.gray}   System is ready for both online and offline operation.${colors.reset}\n`);
             process.exit(0);
         }
     } catch (error) {

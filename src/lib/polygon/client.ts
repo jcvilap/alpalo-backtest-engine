@@ -2,6 +2,10 @@ import { OHLC } from '../types';
 import { toNYDate, getNYNow, formatNYDate } from '../utils/dateUtils';
 import { addDays, subMonths } from 'date-fns';
 import { createClient, RedisClientType } from 'redis';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const CACHE_DIR = path.join(process.cwd(), 'cache');
 
 const BASE_URL = 'https://api.polygon.io/v2/aggs/ticker';
 
@@ -49,37 +53,69 @@ export class PolygonClient {
     }
 
     private async loadCalendar(year: number): Promise<MarketCalendar | null> {
-        if (!redis) return null;
-
-        try {
-            const key = `market-calendar-${year}`;
-            const cached = await redis.get(key);
-            if (!cached) return null;
-
-            const parsed = JSON.parse(cached) as MarketCalendar;
-            parsed.holidays = new Set(parsed.holidaysArray ?? []);
-            parsed.tradingDays = new Set(parsed.tradingDaysArray ?? []);
-            return parsed;
-        } catch (error) {
-            console.warn(`Failed to read calendar cache for ${year}:`, error);
-            return null;
+        // 1. Try Redis
+        if (redis) {
+            try {
+                const key = `market-calendar-${year}`;
+                const cached = await redis.get(key);
+                if (cached) {
+                    const parsed = JSON.parse(cached) as MarketCalendar;
+                    parsed.holidays = new Set(parsed.holidaysArray ?? []);
+                    parsed.tradingDays = new Set(parsed.tradingDaysArray ?? []);
+                    return parsed;
+                }
+            } catch (error) {
+                console.warn(`[REDIS] Failed to read calendar cache for ${year}:`, error);
+            }
         }
+
+        // 2. Try File System
+        try {
+            const filePath = path.join(CACHE_DIR, `market-calendar-${year}.json`);
+            if (fs.existsSync(filePath)) {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                const parsed = JSON.parse(content) as MarketCalendar;
+                parsed.holidays = new Set(parsed.holidaysArray ?? []);
+                parsed.tradingDays = new Set(parsed.tradingDaysArray ?? []);
+                console.log(`[FS] Loaded calendar for ${year} from file`);
+                return parsed;
+            }
+        } catch (error) {
+            console.warn(`[FS] Failed to read calendar file for ${year}:`, error);
+        }
+
+        return null;
     }
 
     private async saveCalendar(calendar: MarketCalendar): Promise<void> {
-        if (!redis) return;
+        const payload = {
+            year: calendar.year,
+            fetchedAt: calendar.fetchedAt,
+            holidaysArray: Array.from(calendar.holidays),
+            tradingDaysArray: Array.from(calendar.tradingDays)
+        };
+        const jsonPayload = JSON.stringify(payload);
 
+        // 1. Save to Redis
+        if (redis) {
+            try {
+                const key = `market-calendar-${calendar.year}`;
+                await redis.set(key, jsonPayload);
+            } catch (error) {
+                console.error(`[REDIS] Failed to save calendar cache for ${calendar.year}:`, error);
+            }
+        }
+
+        // 2. Save to File System
         try {
-            const key = `market-calendar-${calendar.year}`;
-            const payload = {
-                year: calendar.year,
-                fetchedAt: calendar.fetchedAt,
-                holidaysArray: Array.from(calendar.holidays),
-                tradingDaysArray: Array.from(calendar.tradingDays)
-            };
-            await redis.set(key, JSON.stringify(payload));
+            if (!fs.existsSync(CACHE_DIR)) {
+                fs.mkdirSync(CACHE_DIR, { recursive: true });
+            }
+            const filePath = path.join(CACHE_DIR, `market-calendar-${calendar.year}.json`);
+            fs.writeFileSync(filePath, jsonPayload);
+            console.log(`[FS] Saved calendar for ${calendar.year} to file`);
         } catch (error) {
-            console.error(`Failed to save calendar cache for ${calendar.year}:`, error);
+            console.error(`[FS] Failed to save calendar file for ${calendar.year}:`, error);
         }
     }
 
@@ -194,30 +230,36 @@ export class PolygonClient {
     }
 
     private async loadCache(ticker: string): Promise<OHLC[]> {
-        if (!redis) {
-            console.warn(`[CACHE] Redis not available, cannot load cache for ${ticker}`);
-            return [];
+        // 1. Try Redis
+        if (redis) {
+            try {
+                const key = `ohlc:${ticker}`;
+                const cached = await redis.get(key);
+                if (cached) {
+                    return JSON.parse(cached) as OHLC[];
+                }
+            } catch (e) {
+                console.error(`[REDIS] Error reading cache for ${ticker}:`, e);
+            }
         }
 
+        // 2. Try File System
         try {
-            const key = `ohlc:${ticker}`;
-            const cached = await redis.get(key);
-            if (!cached) {
-                return [];
+            const filePath = path.join(CACHE_DIR, `${ticker}.json`);
+            if (fs.existsSync(filePath)) {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                const data = JSON.parse(content) as OHLC[];
+                console.log(`[FS] Loaded ${data.length} records for ${ticker} from file`);
+                return data;
             }
-            return JSON.parse(cached) as OHLC[];
         } catch (e) {
-            console.error(`Error reading Redis cache for ${ticker}:`, e);
-            return [];
+            console.error(`[FS] Error reading cache file for ${ticker}:`, e);
         }
+
+        return [];
     }
 
     private async saveCache(ticker: string, data: OHLC[], allowToday: boolean = true): Promise<void> {
-        if (!redis) {
-            console.warn(`[CACHE] Redis not available, cannot save cache for ${ticker}`);
-            return;
-        }
-
         const now = getNYNow();
         const todayStr = formatNYDate(now);
         const minutes = now.getHours() * 60 + now.getMinutes();
@@ -232,12 +274,31 @@ export class PolygonClient {
         const uniqueData = Array.from(new Map(dataToCache.map(item => [item.date, item])).values())
             .sort((a, b) => toNYDate(a.date).getTime() - toNYDate(b.date).getTime());
 
+        const jsonPayload = JSON.stringify(uniqueData);
+
+        // 1. Save to Redis
+        if (redis) {
+            try {
+                const key = `ohlc:${ticker}`;
+                await redis.set(key, jsonPayload);
+                console.log(`[REDIS] Saved ${uniqueData.length} records for ${ticker}`);
+            } catch (e) {
+                console.error(`[REDIS] Error writing cache for ${ticker}:`, e);
+            }
+        } else {
+            console.warn(`[REDIS] Not available, skipping Redis save for ${ticker}`);
+        }
+
+        // 2. Save to File System
         try {
-            const key = `ohlc:${ticker}`;
-            await redis.set(key, JSON.stringify(uniqueData));
-            console.log(`[CACHE] Saved ${uniqueData.length} records for ${ticker} to Redis`);
+            if (!fs.existsSync(CACHE_DIR)) {
+                fs.mkdirSync(CACHE_DIR, { recursive: true });
+            }
+            const filePath = path.join(CACHE_DIR, `${ticker}.json`);
+            fs.writeFileSync(filePath, jsonPayload);
+            console.log(`[FS] Saved ${uniqueData.length} records for ${ticker} to file`);
         } catch (e) {
-            console.error(`Error writing Redis cache for ${ticker}:`, e);
+            console.error(`[FS] Error writing cache file for ${ticker}:`, e);
         }
     }
 
