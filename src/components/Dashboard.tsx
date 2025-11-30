@@ -31,7 +31,18 @@ function DashboardContent() {
     const [selectedRange, setSelectedRange] = useState<string | null>(null);
     const [strategy, setStrategy] = useState<string>('current');
     const [isInitialized, setIsInitialized] = useState(false);
+    const [availableStrategies, setAvailableStrategies] = useState<{ id: string; name: string }[]>([]);
     const resultCache = useRef<Record<string, BacktestResult>>({});
+
+    // Fetch available strategies
+    useEffect(() => {
+        fetch('/api/strategies')
+            .then(res => res.json())
+            .then(data => {
+                setAvailableStrategies(data);
+            })
+            .catch(err => console.error('Failed to fetch strategies:', err));
+    }, []);
 
     // Auto-populate dates from cache
     useEffect(() => {
@@ -319,8 +330,9 @@ function DashboardContent() {
                                 }}
                                 className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary sm:min-w-[120px]"
                             >
-                                <option value="current">Current</option>
-                                <option value="proposed-volatility-protected">Proposed (Vol Protected)</option>
+                                {availableStrategies.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
                             </select>
                             <input
                                 type="date"
@@ -450,8 +462,9 @@ function DashboardContent() {
                                         }}
                                         className="w-full px-4 py-2 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary appearance-none"
                                     >
-                                        <option value="current">Current Strategy</option>
-                                        <option value="proposed-volatility-protected">Proposed Strategy (Volatility Protected)</option>
+                                        {availableStrategies.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))}
                                     </select>
                                     <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none">
                                         <svg className="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
