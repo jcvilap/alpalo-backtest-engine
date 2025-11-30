@@ -126,6 +126,12 @@ function DashboardContent() {
 
         const rangeParam = searchParams.get('range');
         const tabParam = searchParams.get('tab');
+        const strategyParam = searchParams.get('strategy');
+
+        // Handle Strategy Param
+        if (strategyParam && strategyParam !== strategy) {
+            setStrategy(strategyParam);
+        }
 
         // Handle Range Param
         if (rangeParam) {
@@ -176,10 +182,10 @@ function DashboardContent() {
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isInitialized, searchParams, endDate, loading, pathname, result, router, selectedRange, startDate]);
+    }, [isInitialized, searchParams, endDate, loading, pathname, result, router, selectedRange, startDate, strategy]);
 
     // Update URL when state changes
-    const updateUrl = (range?: string | null, tab?: string, customStart?: string, customEnd?: string) => {
+    const updateUrl = (range?: string | null, tab?: string, customStart?: string, customEnd?: string, newStrategy?: string) => {
         const params = new URLSearchParams(searchParams.toString());
 
         if (customStart && customEnd) {
@@ -194,6 +200,13 @@ function DashboardContent() {
 
         if (tab) {
             params.set('tab', tab);
+        }
+
+        if (newStrategy) {
+            params.set('strategy', newStrategy);
+        } else if (strategy && !params.has('strategy')) {
+            // Ensure current strategy is preserved if not explicitly changed
+            params.set('strategy', strategy);
         }
 
         // Update URL
@@ -297,6 +310,18 @@ function DashboardContent() {
 
                         {/* Inputs Row - Full Width on Mobile */}
                         <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                            <select
+                                value={strategy}
+                                onChange={(e) => {
+                                    const newStrategy = e.target.value;
+                                    setStrategy(newStrategy);
+                                    updateUrl(undefined, undefined, undefined, undefined, newStrategy);
+                                }}
+                                className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary sm:min-w-[120px]"
+                            >
+                                <option value="current">Current</option>
+                                <option value="proposed-volatility-protected">Proposed (Vol Protected)</option>
+                            </select>
                             <input
                                 type="date"
                                 value={startDate}
@@ -418,16 +443,24 @@ function DashboardContent() {
                         {/* Strategy Selector */}
                         <div className="mt-4 pt-4 border-t border-border transition-theme">
                             <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">Strategy</label>
-                            <div className="flex flex-wrap gap-2">
-                                {['current', 'proposed-volatility-protected'].map((s) => (
-                                    <button
-                                        key={s}
-                                        onClick={() => setStrategy(s)}
-                                        className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-theme ' + (strategy === s ? 'bg-primary text-white border-primary' : 'text-text-primary bg-surface border-border hover:bg-surface-hover')}
-                                    >
-                                        {s}
-                                    </button>
-                                ))}
+                            <div className="relative">
+                                <select
+                                    value={strategy}
+                                    onChange={(e) => {
+                                        const newStrategy = e.target.value;
+                                        setStrategy(newStrategy);
+                                        updateUrl(undefined, undefined, undefined, undefined, newStrategy);
+                                    }}
+                                    className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary appearance-none"
+                                >
+                                    <option value="current">Current Strategy</option>
+                                    <option value="proposed-volatility-protected">Proposed Strategy (Volatility Protected)</option>
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none">
+                                    <svg className="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
                             </div>
                         </div>
 
