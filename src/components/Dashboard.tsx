@@ -29,6 +29,7 @@ function DashboardContent() {
     const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'monthly' | 'cli'>('overview');
     const [cliLines, setCliLines] = useState<CliLine[]>([]);
     const [selectedRange, setSelectedRange] = useState<string | null>(null);
+    const [strategy, setStrategy] = useState<string>('current');
     const [isInitialized, setIsInitialized] = useState(false);
     const resultCache = useRef<Record<string, BacktestResult>>({});
 
@@ -208,7 +209,7 @@ function DashboardContent() {
             return;
         }
 
-        const cacheKey = `${start}:${end}`;
+        const cacheKey = `${start}:${end}:${strategy}`;
         const cachedResult = resultCache.current[cacheKey];
 
         if (cachedResult) {
@@ -235,7 +236,8 @@ function DashboardContent() {
                 body: JSON.stringify({
                     from: fetchStartStr,
                     to: end,
-                    displayFrom: start
+                    displayFrom: start,
+                    strategy: strategy
                 })
             });
 
@@ -413,6 +415,22 @@ function DashboardContent() {
                             </div>
                         </div>
 
+                        {/* Strategy Selector */}
+                        <div className="mt-4 pt-4 border-t border-border transition-theme">
+                            <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">Strategy</label>
+                            <div className="flex flex-wrap gap-2">
+                                {['current', 'proposed-volatility-protected'].map((s) => (
+                                    <button
+                                        key={s}
+                                        onClick={() => setStrategy(s)}
+                                        className={'px-3 py-1.5 text-xs font-medium border rounded-lg transition-theme ' + (strategy === s ? 'bg-primary text-white border-primary' : 'text-text-primary bg-surface border-border hover:bg-surface-hover')}
+                                    >
+                                        {s}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         {error && (
                             <div className="mt-4 p-4 bg-danger-bg border border-danger rounded-xl flex items-start gap-3 transition-theme">
                                 <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5 transition-theme" />
@@ -456,75 +474,77 @@ function DashboardContent() {
 
 
                 {/* Results */}
-                {result && (
-                    <div className="relative min-h-[400px]">
+                {
+                    result && (
+                        <div className="relative min-h-[400px]">
 
-                        <div className="space-y-8">
-                            {/* Tabs */}
-                            <div className="flex gap-2 border-b border-border mt-6 transition-theme overflow-x-auto scrollbar-hide">
-                                <button
-                                    onClick={() => handleTabChange('overview')}
-                                    className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
-                                >
-                                    <BarChart2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    Overview
-                                </button>
-                                <button
-                                    onClick={() => handleTabChange('trades')}
-                                    className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'trades' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
-                                >
-                                    <List className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    Trades
-                                </button>
-                                <button
-                                    onClick={() => handleTabChange('monthly')}
-                                    className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'monthly' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
-                                >
-                                    <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    Monthly
-                                </button>
-                                {selectedRange && cliLines.length > 0 && (
+                            <div className="space-y-8">
+                                {/* Tabs */}
+                                <div className="flex gap-2 border-b border-border mt-6 transition-theme overflow-x-auto scrollbar-hide">
                                     <button
-                                        onClick={() => handleTabChange('cli')}
-                                        className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'cli' ? 'border-success text-success' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                        onClick={() => handleTabChange('overview')}
+                                        className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
                                     >
-                                        <Terminal className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                        <span className="hidden sm:inline">CLI Output</span>
-                                        <span className="sm:hidden">CLI</span>
+                                        <BarChart2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                        Overview
                                     </button>
-                                )}
-                            </div>
+                                    <button
+                                        onClick={() => handleTabChange('trades')}
+                                        className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'trades' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                    >
+                                        <List className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                        Trades
+                                    </button>
+                                    <button
+                                        onClick={() => handleTabChange('monthly')}
+                                        className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'monthly' ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                    >
+                                        <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                        Monthly
+                                    </button>
+                                    {selectedRange && cliLines.length > 0 && (
+                                        <button
+                                            onClick={() => handleTabChange('cli')}
+                                            className={'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 border-b-2 transition-theme whitespace-nowrap ' + (activeTab === 'cli' ? 'border-success text-success' : 'border-transparent text-text-secondary hover:text-text-primary')}
+                                        >
+                                            <Terminal className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                            <span className="hidden sm:inline">CLI Output</span>
+                                            <span className="sm:hidden">CLI</span>
+                                        </button>
+                                    )}
+                                </div>
 
-                            {/* Tab Content */}
-                            <div>
-                                {/* OVERVIEW TAB */}
-                                {activeTab === 'overview' && (
-                                    <div className="space-y-8">
-                                        <PerformanceWidgets metrics={result.metrics} />
-                                        <EquityChart equityCurve={result.equityCurve} />
-                                    </div>
-                                )}
+                                {/* Tab Content */}
+                                <div>
+                                    {/* OVERVIEW TAB */}
+                                    {activeTab === 'overview' && (
+                                        <div className="space-y-8">
+                                            <PerformanceWidgets metrics={result.metrics} />
+                                            <EquityChart equityCurve={result.equityCurve} />
+                                        </div>
+                                    )}
 
-                                {/* TRADES TAB */}
-                                {activeTab === 'trades' && (
-                                    <TradeLogTable trades={result.trades} />
-                                )}
+                                    {/* TRADES TAB */}
+                                    {activeTab === 'trades' && (
+                                        <TradeLogTable trades={result.trades} />
+                                    )}
 
-                                {/* MONTHLY PERFORMANCE TAB */}
-                                {activeTab === 'monthly' && (
-                                    <MonthlyPerformanceMatrix equityCurve={result.equityCurve} />
-                                )}
+                                    {/* MONTHLY PERFORMANCE TAB */}
+                                    {activeTab === 'monthly' && (
+                                        <MonthlyPerformanceMatrix equityCurve={result.equityCurve} />
+                                    )}
 
-                                {/* CLI OUTPUT TAB */}
-                                {activeTab === 'cli' && (
-                                    <CliOutput lines={cliLines} />
-                                )}
+                                    {/* CLI OUTPUT TAB */}
+                                    {activeTab === 'cli' && (
+                                        <CliOutput lines={cliLines} />
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
-        </div>
+                    )
+                }
+            </div >
+        </div >
     );
 }
 

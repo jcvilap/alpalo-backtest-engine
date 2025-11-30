@@ -4,13 +4,14 @@ import { fetchBacktestData } from '@/lib/backtest/dataFetcher';
 import { BacktestDataFeed } from '@/backtest/BacktestDataFeed';
 import { BacktestBroker } from '@/backtest/BacktestBroker';
 import { BacktestRunner } from '@/backtest/BacktestRunner';
+import { getStrategy } from '@/strategy/registry';
 import { createDefaultStrategyParams } from '@/strategy/engine';
 
 export async function POST(request: Request) {
     try {
-        const { from, to, displayFrom } = await request.json();
+        const { from, to, displayFrom, strategy: strategyName } = await request.json();
 
-        console.log('[BACKTEST API] Request params:', { from, to, displayFrom });
+        console.log('[BACKTEST API] Request params:', { from, to, displayFrom, strategy: strategyName });
 
         if (!from || !to) {
             return NextResponse.json({ error: 'Missing from or to date' }, { status: 400 });
@@ -39,7 +40,11 @@ export async function POST(request: Request) {
         const dataFeed = new BacktestDataFeed(qqqData, tqqqData, sqqqData);
         const broker = new BacktestBroker(capital);
         const params = createDefaultStrategyParams();
-        const runner = new BacktestRunner(dataFeed, broker, params);
+
+        // Load requested strategy (default to 'current')
+        const strategy = getStrategy(strategyName || 'current');
+
+        const runner = new BacktestRunner(dataFeed, broker, params, strategy);
 
         const { firstDate, lastDate } = dataFeed.getAvailableDateRange();
 
