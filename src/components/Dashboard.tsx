@@ -388,71 +388,18 @@ function DashboardContent() {
                             </div>
                             <ThemeToggle />
                         </div>
-                        <p className="text-text-secondary text-lg transition-theme">Leveraged ETF Momentum Strategy</p>
-                        <div className="relative group inline-block mt-2">
-                            <div className="text-xs text-text-tertiary cursor-help flex items-center gap-1 transition-theme">
-                                {/* Omitted for brevity - Strategy info tooltip */}
-                            </div>
-                        </div>
+
                     </div>
                 )}
 
                 {/* Input Panel - hidden when results are loaded */}
                 {!result && (
                     <div className="bg-surface rounded-2xl shadow-lg border border-border-light p-6 mb-8 transition-theme">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">Start Date</label>
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                            {/* Strategy Selector */}
+                            <div className="md:col-span-3">
+                                <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">Strategy</label>
                                 <div className="relative">
-                                    <input
-                                        type="date"
-                                        value={startDate}
-                                        min={minDate}
-                                        onChange={(e) => {
-                                            const newStart = e.target.value;
-                                            setStartDate(newStart);
-                                            setSelectedRange(null);
-                                            // Update URL with custom date range if both dates are set
-                                            if (newStart && endDate) {
-                                                updateUrl(undefined, undefined, newStart, endDate);
-                                            }
-                                        }}
-                                        className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary"
-                                    />
-                                </div>
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">End Date</label>
-                                <div className="relative">
-                                    <input
-                                        type="date"
-                                        value={endDate}
-                                        onChange={(e) => {
-                                            const newEnd = e.target.value;
-                                            setEndDate(newEnd);
-                                            setSelectedRange(null);
-                                            // Update URL with custom date range if both dates are set
-                                            if (startDate && newEnd) {
-                                                updateUrl(undefined, undefined, startDate, newEnd);
-                                            }
-                                        }}
-                                        className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <button
-                                    onClick={() => runBacktest()}
-                                    disabled={loading}
-                                    className={'w-full py-3 rounded-xl font-semibold transition-theme flex items-center justify-center gap-2 shadow-lg hover:shadow-xl ' + (loading ? 'bg-gray-300 cursor-not-allowed text-gray-600' : 'bg-primary hover:bg-primary-hover text-white')}
-                                >
-                                    <Play className="w-5 h-5" />
-                                    {loading ? 'Running...' : 'Run Backtest'}
-                                </button>
-                            </div>
-                            <div className="md:col-span-5 mt-4 pt-4 border-t border-border transition-theme flex items-center gap-4">
-                                <label className="text-sm font-semibold text-text-secondary transition-theme whitespace-nowrap">Strategy:</label>
-                                <div className="relative flex-1 max-w-md">
                                     <select
                                         value={strategy}
                                         onChange={(e) => {
@@ -460,7 +407,7 @@ function DashboardContent() {
                                             setStrategy(newStrategy);
                                             updateUrl(undefined, undefined, undefined, undefined, newStrategy);
                                         }}
-                                        className="w-full px-4 py-2 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary appearance-none"
+                                        className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary appearance-none"
                                     >
                                         {availableStrategies.map(s => (
                                             <option key={s.id} value={s.id}>{s.name}</option>
@@ -473,9 +420,51 @@ function DashboardContent() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Start Date */}
+                            <div className="md:col-span-3">
+                                <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">Start Date</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    min={minDate}
+                                    max={endDate}
+                                    onChange={(e) => {
+                                        setStartDate(e.target.value);
+                                        updateUrl(undefined, undefined, e.target.value, undefined);
+                                    }}
+                                    className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary"
+                                />
+                            </div>
+
+                            {/* End Date */}
+                            <div className="md:col-span-3">
+                                <label className="block text-sm font-semibold text-text-secondary mb-2 transition-theme">End Date</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    min={startDate}
+                                    max={formatNYDate(getNYNow())}
+                                    onChange={(e) => {
+                                        setEndDate(e.target.value);
+                                        updateUrl(undefined, undefined, undefined, e.target.value);
+                                    }}
+                                    className="w-full px-4 py-3 bg-surface border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary"
+                                />
+                            </div>
+
+                            {/* Run Button */}
+                            <div className="md:col-span-2">
+                                <button
+                                    onClick={() => runBacktest()}
+                                    disabled={loading}
+                                    className={'w-full py-3 rounded-xl font-semibold transition-theme flex items-center justify-center gap-2 shadow-lg hover:shadow-xl ' + (loading ? 'bg-gray-300 cursor-not-allowed text-gray-600' : 'bg-primary hover:bg-primary-hover text-white')}
+                                >
+                                    <Play className="w-5 h-5" />
+                                    {loading ? 'Running...' : 'Run'}
+                                </button>
+                            </div>
                         </div>
-
-
 
                         {error && (
                             <div className="mt-4 p-4 bg-danger-bg border border-danger rounded-xl flex items-start gap-3 transition-theme">
