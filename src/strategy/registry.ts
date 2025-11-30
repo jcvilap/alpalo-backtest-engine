@@ -1,6 +1,7 @@
 import { MarketSnapshot, PortfolioState, StrategyParams, StrategyDecision } from './types';
 import { runStrategy as currentStrategy } from './strategies/current';
 import { runStrategy as proposedVolatilityProtected } from './strategies/proposed-volatility-protected';
+import { runStrategy as proposedNew } from './strategies/proposed-new';
 
 export type StrategyFunction = (
     snapshot: MarketSnapshot,
@@ -11,6 +12,7 @@ export type StrategyFunction = (
 export const AVAILABLE_STRATEGIES = {
     'current': currentStrategy,
     'proposed-volatility-protected': proposedVolatilityProtected,
+    'proposed-new': proposedNew,
 } as const;
 
 export type StrategyName = keyof typeof AVAILABLE_STRATEGIES;
