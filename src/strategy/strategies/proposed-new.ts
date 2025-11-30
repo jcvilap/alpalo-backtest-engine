@@ -53,7 +53,7 @@ const CONFIG = {
 export function runStrategy(
     snapshot: MarketSnapshot,
     portfolio: PortfolioState,
-    params: StrategyParams
+    _params: StrategyParams
 ): StrategyDecision {
     // Validate inputs
     if (!snapshot.qqqHistory || snapshot.qqqHistory.length < 250) {
@@ -209,19 +209,6 @@ function calculateRSI(history: MarketBar[], period: number): number {
     return rsi;
 }
 
-function calculateVolumeRatio(history: MarketBar[], period: number): number {
-    if (history.length < period + 1) return 1.0;
-
-    const recentData = history.slice(-period - 1);
-    const currentVolume = recentData[recentData.length - 1].volume;
-
-    const avgVolume = recentData.slice(0, -1).reduce((sum, bar) => sum + bar.volume, 0) / period;
-
-    if (avgVolume === 0) return 1.0;
-
-    return currentVolume / avgVolume;
-}
-
 function calculateROC(history: MarketBar[], period: number): number {
     if (history.length < period + 1) return 0;
 
@@ -238,23 +225,4 @@ function calculateSMA(history: MarketBar[], period: number): number {
 
     const recentData = history.slice(-period);
     return recentData.reduce((sum, bar) => sum + bar.close, 0) / period;
-}
-
-function calculateVolatility(history: MarketBar[], period: number): number {
-    if (history.length < period + 1) return 0;
-
-    const recentData = history.slice(-period - 1);
-    const returns: number[] = [];
-
-    for (let i = 1; i < recentData.length; i++) {
-        const ret = Math.log(recentData[i].close / recentData[i - 1].close);
-        returns.push(ret);
-    }
-
-    const mean = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-    const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / (returns.length - 1);
-    const stdDev = Math.sqrt(variance);
-
-    // Annualize
-    return stdDev * Math.sqrt(252);
 }
