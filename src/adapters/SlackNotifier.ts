@@ -31,7 +31,7 @@ export class SlackNotifier implements Notifier {
     /**
      * Send a notification to Slack and log to console
      */
-    async notify(subject: string, message: string, level: NotificationLevel, metadata?: any): Promise<void> {
+    async notify(subject: string, message: string, level: NotificationLevel, metadata?: Record<string, unknown>): Promise<void> {
         // Always log to console
         this.logToConsole(subject, message, level, metadata);
 
@@ -65,7 +65,7 @@ export class SlackNotifier implements Notifier {
     /**
      * Format the message for Slack
      */
-    private formatMessage(subject: string, message: string, level: NotificationLevel, metadata?: any): string {
+    private formatMessage(subject: string, message: string, level: NotificationLevel, metadata?: Record<string, unknown>): string {
         const prefix = this.getPrefix(level);
         let text = `${prefix} *${subject}*\n${message}`;
 
@@ -92,7 +92,7 @@ export class SlackNotifier implements Notifier {
     /**
      * Log to console with appropriate level
      */
-    private logToConsole(subject: string, message: string, level: NotificationLevel, metadata?: any): void {
+    private logToConsole(subject: string, message: string, level: NotificationLevel, metadata?: Record<string, unknown>): void {
         const logFn = level === 'ERROR' ? console.error : level === 'WARN' ? console.warn : console.log;
         logFn(`[${level}] ${subject}: ${message}`, metadata || '');
     }

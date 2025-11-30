@@ -116,7 +116,7 @@ export class LiveRunner {
         await this.notifier.notify(
             `${this.accountConfig.name} - Starting Trading Run`,
             `Starting trading run for ${executionDate}\nMode: ${this.accountConfig.isPaper ? 'PAPER' : 'LIVE'}`,
-            NotificationLevel.INFO,
+            'INFO',
             {
                 account: this.accountConfig.name,
                 date: executionDate,
@@ -201,7 +201,7 @@ export class LiveRunner {
             await this.notifier.notify(
                 `${this.accountConfig.name} - Trading Run Completed`,
                 successMessage,
-                NotificationLevel.INFO,
+                'INFO',
                 {
                     account: this.accountConfig.name,
                     date: executionDate,
@@ -223,7 +223,7 @@ export class LiveRunner {
             await this.notifier.notify(
                 `${this.accountConfig.name} - Trading Run FAILED`,
                 `❌ Error during trading run for ${executionDate}\n\n**Error:** ${errorMessage}\n\n**Stack Trace:**\n\`\`\`\n${stackTrace || 'No stack trace available'}\n\`\`\``,
-                NotificationLevel.ERROR,
+                'ERROR',
                 {
                     account: this.accountConfig.name,
                     date: executionDate,
@@ -254,7 +254,7 @@ export class LiveRunner {
         await this.notifier.notify(
             `${this.accountConfig.name} - Starting Dry Run`,
             `Starting dry run (no real orders) for ${executionDate}\nMode: ${this.accountConfig.isPaper ? 'PAPER' : 'LIVE'}`,
-            NotificationLevel.INFO,
+            'INFO',
             {
                 account: this.accountConfig.name,
                 date: executionDate,
@@ -318,7 +318,7 @@ export class LiveRunner {
             await this.notifier.notify(
                 `${this.accountConfig.name} - Dry Run Completed`,
                 `🧪 DRY RUN (No real orders placed)\n\n${successMessage}`,
-                NotificationLevel.INFO,
+                'INFO',
                 {
                     account: this.accountConfig.name,
                     date: executionDate,
@@ -340,7 +340,7 @@ export class LiveRunner {
             await this.notifier.notify(
                 `${this.accountConfig.name} - Dry Run FAILED`,
                 `❌ Error during dry run for ${executionDate}\n\n**Error:** ${errorMessage}\n\n**Stack Trace:**\n\`\`\`\n${stackTrace || 'No stack trace available'}\n\`\`\``,
-                NotificationLevel.ERROR,
+                'ERROR',
                 {
                     account: this.accountConfig.name,
                     date: executionDate,

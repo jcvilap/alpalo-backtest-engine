@@ -16,5 +16,5 @@ export interface Notifier {
      * @param level - Severity level (INFO, WARN, ERROR)
      * @param metadata - Optional additional data to attach
      */
-    notify(subject: string, message: string, level: NotificationLevel, metadata?: any): Promise<void>;
+    notify(subject: string, message: string, level: NotificationLevel, metadata?: Record<string, unknown>): Promise<void>;
 }

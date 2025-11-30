@@ -75,7 +75,7 @@ async function executeAccount(
 
     try {
         // Create notifier for this account
-        const notifier = new SlackNotifier(account.name, account.isPaper);
+        const notifier = new SlackNotifier(!account.isPaper);
 
         // Create broker for this account
         const broker = createBroker(account);
