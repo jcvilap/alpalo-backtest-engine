@@ -328,7 +328,7 @@ function DashboardContent() {
                                     setStrategy(newStrategy);
                                     updateUrl(undefined, undefined, undefined, undefined, newStrategy);
                                 }}
-                                className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary sm:min-w-[120px]"
+                                className="flex-1 sm:flex-none min-w-0 px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-theme text-text-primary sm:min-w-[120px]"
                             >
                                 {availableStrategies.map(s => (
                                     <option key={s.id} value={s.id}>{s.name}</option>

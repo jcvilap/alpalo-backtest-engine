@@ -257,6 +257,8 @@ async function main() {
         console.error(`\n${colors.red}❌ Error running backtest:${colors.reset}`, error);
         process.exit(1);
     }
+    // Force exit to ensure all resources (like Redis) are closed
+    process.exit(0);
 }
 
 main();
