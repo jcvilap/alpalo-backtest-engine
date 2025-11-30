@@ -161,9 +161,6 @@ export function runStrategy(
     const confirmedBearTrend = currentPrice < currentMA50 && currentMA50 < currentMA200;
     const transitional = currentPrice < currentMA200 && currentPrice > currentMA50;
 
-    // ENHANCEMENT: Also check EMA for early bull detection
-    const emaSupport = currentPrice > currentEMA21; // Early warning
-
     // ===== TREND FOLLOWING SIGNALS =====
 
     // Strong Bull: Full exposure (same as current)
